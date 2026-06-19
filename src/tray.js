@@ -161,6 +161,7 @@ function updateMenu() {
     },
     {
       label: 'Start with Windows',
+      sublabel: 'Launch minimized at login',
       type: 'checkbox',
       checked: autoStartEnabled(),
       click: (menuItem) => {

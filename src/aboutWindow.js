@@ -37,8 +37,12 @@ function openAboutWindow() {
   }
 
   aboutWindow = new BrowserWindow({
+    // useContentSize makes width/height the *content* area (excludes the OS
+    // title bar), so the card always fits with no scrollbar. The card renders
+    // ~454px tall + 44px body padding ≈ 498px; 506 leaves a hair of margin.
     width: 432,
-    height: 472,
+    height: 506,
+    useContentSize: true,
     resizable: false,
     backgroundColor: '#0d0e12',
     minimizable: false,

@@ -15,21 +15,31 @@ const updater = require('./updater');
 // Whether to fetch poster art via Cinemeta (toggleable from the tray; default on).
 let showPosters = true;
 
+// A stable name for the Windows "Run" registry entry so Task Manager's
+// Startup tab lists the app clearly and the entry is easy to find/toggle.
+const LOGIN_ITEM_NAME = 'StremioDiscordPresence';
+
 /**
  * Whether the app is configured to launch automatically at Windows login.
  * @returns {boolean}
  */
 function isAutoStartEnabled() {
-  return app.getLoginItemSettings().openAtLogin;
+  return app.getLoginItemSettings({ name: LOGIN_ITEM_NAME }).openAtLogin;
 }
 
 /**
  * Enable or disable launching the app at Windows login.
+ *
+ * We pass an explicit name and the real executable path so Windows registers a
+ * clear HKCU\...\Run entry that shows up in Task Manager's Startup tab. Without
+ * the name, Electron uses an Update.exe stub that can be hidden or ambiguous.
  * @param {boolean} enabled
  */
 function setAutoStart(enabled) {
   app.setLoginItemSettings({
     openAtLogin: enabled,
+    name: LOGIN_ITEM_NAME,
+    path: process.execPath,
     // Start minimized to tray (no flashing window) on login.
     args: ['--hidden']
   });

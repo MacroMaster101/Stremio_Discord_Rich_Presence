@@ -1,6 +1,6 @@
 {
   "name": "stremio-discord-presence",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A Windows system tray companion app that displays your Stremio status on Discord Rich Presence.",
   "main": "src/main.js",
   "scripts": {
