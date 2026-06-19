@@ -85,10 +85,10 @@ This produces these files in the `dist/` folder:
 
 > ⚠️ All three files must be uploaded to the release. If `latest.yml` is missing, auto-update breaks.
 
-> 💡 You currently have a build at `D:\My Projects\Stremio Discord Presence Setup 1.0.0.exe`.
-> For a proper release, rebuild with `npm run dist` so the matching `latest.yml` and
-> `.blockmap` land in `dist/` next to the `.exe` — those two extra files are what the
-> auto-updater relies on.
+> 💡 GitHub uploads file names with spaces as hyphens, so the `.exe` lands as
+> `Stremio-Discord-Presence-Setup-x.x.x.exe` — which is exactly what `latest.yml`
+> references. If you upload manually, rename the `.exe` and `.blockmap` to the
+> hyphenated form first so the names match `latest.yml`.
 
 ---
 

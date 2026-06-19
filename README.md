@@ -49,11 +49,17 @@ Pulls genuine posters from Stremio's own Cinemeta addon (no API key) with a litt
 🫥 **Privacy Mode**
 One click swaps to a generic *"Watching Stremio"* — hides what you're actually watching *and* disables poster lookups.
 
-🎨 **Live status tray icon**
-The tray dot reflects your connection at a glance — 🟢 connected, 🟡 connecting, 🔴 disconnected.
+🟣 **Browsing vs watching**
+Shows *"Browsing Stremio"* when you're picking something, and switches to the title the moment you start streaming.
+
+🎨 **Theme-aware tray icon**
+A status dot (🟢 connected · 🟡 connecting · 🔴 disconnected) with an outline that adapts to your light or dark Windows taskbar.
 
 🚀 **Start with Windows**
-Optional toggle to launch at login, minimized to the tray.
+Optional toggle to launch minimized at login — and it shows up in Task Manager's Startup tab.
+
+🔄 **Auto-updates**
+Checks GitHub for new versions, downloads in the background, and offers a one-click **Restart to update** from the tray.
 
 🔁 **Bulletproof reconnect**
 Handles Discord not running at startup, or being closed and reopened — it just reconnects.
@@ -69,8 +75,10 @@ Handles Discord not running at startup, or being closed and reopened — it just
 ### Option A — Installer *(recommended for most users)*
 
 1. Download **`Stremio Discord Presence Setup x.x.x.exe`** from the **[Releases](https://github.com/MacroMaster101/Stremio_Discord_Rich_Presence/releases)** page.
-2. Run it and follow the wizard — pick your install location; desktop and Start Menu shortcuts are created.
+2. Run it and follow the wizard — pick your install location. On the final step you can tick **Create a desktop shortcut** (a Start Menu shortcut is always added).
 3. Launch the app — it appears in your system tray and connects to Discord automatically.
+
+> 🛡️ **First launch:** Windows SmartScreen may warn about an "unknown publisher" because the app isn't signed with a paid certificate. Click **More info → Run anyway** — it's expected for indie apps.
 
 > 💡 That's it. No Node.js, no `.env`, no Discord account setup — the app ships with a built-in Discord application ID.
 
@@ -91,10 +99,12 @@ npm start
 
 Look for the Stremio Discord Presence icon in your Windows system tray (near the clock). **Click it** to open the menu, where you can:
 
-- 👀 View live connection statuses (Discord & Stremio)
+- 👀 View live connection statuses (Discord & Stremio — including the current title or *Browsing*)
 - 🫥 Toggle **Privacy Mode** to hide what you're watching
-- 🚀 Toggle **Start with Windows**
+- 🚀 Toggle **Start with Windows** (launches minimized at login)
+- 🖼️ Toggle **Show Poster Art**
 - 🔁 **Reconnect Discord** manually
+- 🔄 **Check for Updates** — and **Restart to update** when one is ready
 - ℹ️ Open **About** for version info and links
 - ❌ **Quit** the application
 
@@ -160,7 +170,10 @@ This app is **privacy-respecting by default**:
 stremio-discord-presence/
 ├── package.json            # Node dependencies, build config & scripts
 ├── README.md               # Documentation & setup instructions
+├── RELEASING.md            # How to build & publish a release
 ├── .env.example            # Environment variables template
+├── build/
+│   └── installer.nsh       # Custom NSIS: desktop-shortcut checkbox on install
 ├── assets/
 │   ├── app-icon.ico        # Windows executable / installer icon
 │   ├── app-icon.png        # App window & About icon
@@ -171,8 +184,9 @@ stremio-discord-presence/
     ├── stremioDetector.js  # Stremio detection + active-title parsing
     ├── cinemeta.js         # Poster lookups via Stremio's Cinemeta addon
     ├── discordRpc.js       # Discord Rich Presence connection manager
+    ├── updater.js          # Auto-update via electron-updater + GitHub Releases
     ├── tray.js             # System tray menu and status rendering
-    ├── trayIcon.js         # Builds status-colored tray icons at runtime
+    ├── trayIcon.js         # Builds theme-aware, status-colored tray icons
     ├── aboutWindow.js      # Controller for the About window
     ├── aboutPreload.js     # Secure contextBridge preload for the About window
     └── about.html          # UI for the About window
@@ -199,8 +213,9 @@ stremio-discord-presence/
 
 <br/>
 
-- Ensure Stremio Desktop is running. The app looks for a process named `stremio.exe` on Windows.
+- Ensure Stremio Desktop is running. The app looks for the `stremio-shell-ng.exe` or `stremio.exe` process on Windows.
 - Make sure Stremio is fully launched, not just sitting idle in the background.
+- Poster art and titles come from Stremio's local server on `127.0.0.1:11470`; if a title doesn't appear, give it a few seconds to start streaming.
 
 </details>
 
@@ -232,12 +247,15 @@ npm run dist
 
 **Recently shipped ✅**
 
+- 🟣 **Browsing state** — shows *"Browsing Stremio"* when idle, switching to the title on playback.
+- 🔄 **Auto-updates** — background download with a one-click **Restart to update** from the tray.
+- 🎨 **Redesigned About window** and a **theme-aware tray icon** that adapts to light/dark taskbars.
+- 🖥️ **Desktop-shortcut choice** — an opt-in checkbox on the installer's final step.
 - 📺 **Rich title parsing** — series name with `SxxExx` + episode title, or movie name and year.
 - 🖼️ **Poster artwork** — real posters from Stremio's Cinemeta addon (no API key) with a Stremio badge overlay.
 - 🔘 **Presence buttons** — "Get Stremio" and "Search Title" on the Rich Presence card.
-- 🚀 **Launch on Startup** — run at Windows login.
+- 🚀 **Launch on Startup** — run minimized at Windows login.
 - 🟢 **Built-in Discord application** — works with zero setup.
-- 🎨 **Redesigned tray menu** with a status-colored icon and About window.
 
 ---
 
