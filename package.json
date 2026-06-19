@@ -1,0 +1,71 @@
+{
+  "name": "stremio-discord-presence",
+  "version": "1.0.0",
+  "description": "A Windows system tray companion app that displays your Stremio status on Discord Rich Presence.",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "pack": "electron-builder --dir"
+  },
+  "keywords": [
+    "stremio",
+    "discord",
+    "rich-presence",
+    "electron"
+  ],
+  "author": "Kavisha Lakshan",
+  "license": "MIT",
+  "dependencies": {
+    "discord-rpc": "^4.0.1",
+    "dotenv": "^16.4.5",
+    "electron-updater": "^6.8.9"
+  },
+  "devDependencies": {
+    "electron": "^42.4.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.kavishalakshan.stremiodiscordpresence",
+    "productName": "Stremio Discord Presence",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "MacroMaster101",
+        "repo": "Stremio_Discord_Rich_Presence"
+      }
+    ],
+    "files": [
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": ".env.example",
+        "to": ".env.example"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/app-icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Stremio Discord Presence",
+      "installerIcon": "assets/app-icon.ico",
+      "uninstallerIcon": "assets/app-icon.ico",
+      "installerHeaderIcon": "assets/app-icon.ico"
+    }
+  }
+}

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:;" />
+  <title>About — Stremio Discord Presence</title>
+  <style>
+    :root {
+      --bg: #1e1f22;
+      --text: #f2f3f5;
+      --muted: #9aa0a6;
+      --accent: #5865f2;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%;
+      background: var(--bg); color: var(--text);
+      font-family: "Segoe UI", system-ui, sans-serif;
+      user-select: none;
+    }
+    body {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: 24px;
+    }
+    img.logo {
+      width: 72px; height: 72px; border-radius: 16px;
+      margin-bottom: 14px; object-fit: cover;
+    }
+    h1 { font-size: 17px; margin: 0 0 2px; }
+    .version { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+    p.desc {
+      font-size: 13px; color: var(--muted);
+      line-height: 1.5; margin: 0 0 18px; max-width: 320px;
+    }
+    .links { display: flex; gap: 16px; margin-bottom: 18px; }
+    .links a {
+      color: var(--accent); text-decoration: none;
+      font-size: 13px; cursor: pointer;
+    }
+    .links a:hover { text-decoration: underline; }
+    .credit { font-size: 11px; color: var(--muted); }
+    button {
+      margin-top: 18px;
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      padding: 8px 20px; border: none; border-radius: 6px;
+      background: var(--accent); color: #fff; cursor: pointer;
+    }
+    button:hover { background: #4752c4; }
+  </style>
+</head>
+<body>
+  <img class="logo" id="logo" alt="" />
+  <h1>Stremio Discord Presence</h1>
+  <div class="version" id="version">v—</div>
+  <p class="desc">
+    Shows your Stremio activity on Discord Rich Presence — automatically,
+    from your system tray.
+  </p>
+  <div class="links">
+    <a id="repoLink">GitHub</a>
+    <a id="portalLink">Discord Developer Portal</a>
+  </div>
+  <div class="credit" id="credit">© Kavisha Lakshan · MIT License</div>
+  <button id="closeBtn" type="button">Close</button>
+
+  <script>
+    // Uses the minimal `aboutAPI` bridge exposed by aboutPreload.js.
+    // No direct Node / ipcRenderer / shell access in this renderer.
+    aboutAPI.getInfo().then((info) => {
+      if (!info) return;
+      document.getElementById('version').textContent = 'v' + info.version;
+      if (info.iconDataUrl) document.getElementById('logo').src = info.iconDataUrl;
+      if (info.author) {
+        document.getElementById('credit').textContent =
+          '© ' + info.author + ' · ' + (info.license || 'MIT') + ' License';
+      }
+    });
+
+    document.getElementById('repoLink').addEventListener('click', () => {
+      aboutAPI.openLink('github');
+    });
+    document.getElementById('portalLink').addEventListener('click', () => {
+      aboutAPI.openLink('discordPortal');
+    });
+    document.getElementById('closeBtn').addEventListener('click', () => {
+      aboutAPI.close();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') aboutAPI.close();
+    });
+  </script>
+</body>
+</html>
