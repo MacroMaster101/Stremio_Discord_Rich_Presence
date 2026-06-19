@@ -7,12 +7,13 @@
  * a colored status dot (see trayIcon.js).
  */
 
-const { Tray, Menu, app, Notification } = require('electron');
+const { Tray, Menu, app, Notification, nativeTheme } = require('electron');
 const trayIcon = require('./trayIcon');
 
 let tray = null;
 let discordStatus = 'Disconnected';
 let stremioRunning = false;
+let activeTitle = null; // current media title when something is playing, else null
 let privacyMode = false;
 let callbacks = {};
 
@@ -55,7 +56,26 @@ function createTray(initialPrivacyMode, eventCallbacks) {
   updateMenu();
   refreshIcon();
 
+  // Re-render the status icon when the OS theme flips so its outline keeps
+  // contrasting with the new (light/dark) taskbar.
+  try {
+    nativeTheme.on('updated', () => refreshIcon());
+  } catch (e) {
+    // Best-effort; safe to ignore if events are unavailable.
+  }
+
   return tray;
+}
+
+/**
+ * Shorten a string to a max length with an ellipsis, for menu labels.
+ * @param {string} s
+ * @param {number} max
+ * @returns {string}
+ */
+function truncate(s, max) {
+  if (!s) return s;
+  return s.length > max ? s.slice(0, max - 1).trimEnd() + '…' : s;
 }
 
 /**
@@ -89,15 +109,28 @@ function updateMenu() {
   if (!tray) return;
 
   const discordBadge = DISCORD_BADGE[discordStatus] || '🔴';
-  const stremioBadge = stremioRunning ? '▶️' : '⏹️';
-  const stremioText = stremioRunning ? 'Running' : 'Not running';
+
+  // Three Stremio states: closed, open & browsing, open & watching something.
+  let stremioBadge;
+  let stremioText;
+  if (!stremioRunning) {
+    stremioBadge = '⏹️';
+    stremioText = 'Not running';
+  } else if (activeTitle && !privacyMode) {
+    stremioBadge = '▶️';
+    stremioText = `Watching · ${truncate(activeTitle, 32)}`;
+  } else if (stremioRunning) {
+    stremioBadge = '🟣';
+    stremioText = 'Browsing';
+  }
 
   const template = [
     { label: 'Stremio Discord Presence', enabled: false },
     { type: 'separator' },
-    { label: `${discordBadge}  Discord: ${discordStatus}`, enabled: false },
-    { label: `${stremioBadge}  Stremio: ${stremioText}`, enabled: false },
+    { label: `${discordBadge}  Discord — ${discordStatus}`, enabled: false },
+    { label: `${stremioBadge}  Stremio — ${stremioText}`, enabled: false },
     { type: 'separator' },
+    { label: 'Settings', enabled: false },
     {
       label: 'Privacy Mode',
       sublabel: 'Hide what you’re watching',
@@ -191,9 +224,11 @@ function updateDiscordStatus(status) {
 /**
  * Dynamically updates the Stremio status display in the system tray.
  * @param {boolean} isRunning - Whether the Stremio process is running.
+ * @param {string|null} [title] - Current media title if something is playing.
  */
-function updateStremioStatus(isRunning) {
+function updateStremioStatus(isRunning, title) {
   stremioRunning = isRunning;
+  activeTitle = isRunning ? (title || null) : null;
   updateMenu();
   refreshIcon();
 }

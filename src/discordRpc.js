@@ -160,8 +160,11 @@ function updatePresence(isStremioRunning, privacyMode, media, posterUrl) {
       activity.details = media.year ? `${media.name} (${media.year})` : media.name;
       activity.state = 'Watching a movie';
     } else {
-      activity.details = 'Watching Stremio';
-      activity.state = 'Using Stremio Desktop';
+      // Stremio is open but nothing is streaming — the user is browsing the
+      // catalogue, on the home page, searching, etc. Stremio's local API does
+      // not expose which screen they're on, so we show a generic idle state.
+      activity.details = 'Browsing Stremio';
+      activity.state = 'Looking for something to watch';
     }
 
     // Add a "Search" button for the current title.

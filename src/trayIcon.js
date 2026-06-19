@@ -7,7 +7,7 @@
 
 const path = require('path');
 const zlib = require('zlib');
-const { nativeImage } = require('electron');
+const { nativeImage, nativeTheme } = require('electron');
 
 // Tray icons render small; 32x32 is crisp on Windows without being heavy.
 const ICON_SIZE = 32;
@@ -68,34 +68,48 @@ function crc32(buf) {
 }
 
 /**
- * Generate an RGBA PNG buffer of the given size containing a single filled,
- * anti-aliased circle (the status dot) over a transparent background.
- * @param {[number,number,number]} rgb
+ * Generate an RGBA PNG buffer containing the status dot with a contrasting
+ * outline, over a transparent background. The outline color is chosen to
+ * contrast with the current taskbar (dark vs light) so the status reads on any
+ * background — the dot's own color never has to fight the taskbar.
+ * @param {[number,number,number]} rgb - The dot fill color.
+ * @param {[number,number,number]} ring - The outline color.
  * @returns {Buffer} PNG file bytes.
  */
-function makeDotPng(rgb) {
+function makeDotPng(rgb, ring) {
   const size = ICON_SIZE;
   const bytesPerPixel = 4;
   const stride = size * bytesPerPixel;
   // Raw image: one extra filter byte (0) per scanline.
   const raw = Buffer.alloc((stride + 1) * size, 0);
 
+  // A 1.5px ring sits just outside the fill radius for legibility on any bg.
+  const ringWidth = 1.5;
+  const outerRadius = DOT_RADIUS + ringWidth;
+
   for (let y = 0; y < size; y++) {
     const rowStart = y * (stride + 1);
     raw[rowStart] = 0; // filter type "none"
     for (let x = 0; x < size; x++) {
-      // Anti-aliased coverage based on distance from the dot center.
       const dx = x + 0.5 - DOT_CENTER_X;
       const dy = y + 0.5 - DOT_CENTER_Y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const coverage = Math.max(0, Math.min(1, DOT_RADIUS - dist + 0.5));
-      if (coverage <= 0) continue;
+
+      // Anti-aliased coverage for the outer (ring) edge and inner (fill) edge.
+      const outerCov = Math.max(0, Math.min(1, outerRadius - dist + 0.5));
+      if (outerCov <= 0) continue;
+      const fillCov = Math.max(0, Math.min(1, DOT_RADIUS - dist + 0.5));
+
+      // Blend fill over ring: fill where inside, ring in the annulus.
+      const r = Math.round(rgb[0] * fillCov + ring[0] * (1 - fillCov));
+      const g = Math.round(rgb[1] * fillCov + ring[1] * (1 - fillCov));
+      const b = Math.round(rgb[2] * fillCov + ring[2] * (1 - fillCov));
 
       const px = rowStart + 1 + x * bytesPerPixel;
-      raw[px] = rgb[0];
-      raw[px + 1] = rgb[1];
-      raw[px + 2] = rgb[2];
-      raw[px + 3] = Math.round(coverage * 255);
+      raw[px] = r;
+      raw[px + 1] = g;
+      raw[px + 2] = b;
+      raw[px + 3] = Math.round(outerCov * 255);
     }
   }
 
@@ -130,20 +144,47 @@ function getBaseIcon() {
 }
 
 /**
+ * Whether the OS is currently using a dark theme (dark taskbar). Falls back to
+ * dark, which is the most common Windows taskbar.
+ * @returns {boolean}
+ */
+function isDarkTheme() {
+  try {
+    return nativeTheme.shouldUseDarkColors;
+  } catch (e) {
+    return true;
+  }
+}
+
+// Invalidate the variant cache whenever the system theme flips, so the ring
+// re-renders for the new taskbar color on the next getIcon() call.
+try {
+  nativeTheme.on('updated', () => variantCache.clear());
+} catch (e) {
+  // nativeTheme events are best-effort; safe to ignore if unavailable.
+}
+
+/**
  * Build (and cache) a tray icon for the given status, compositing the colored
- * status dot onto the base icon.
+ * status dot — with a theme-contrasting outline — onto the base icon.
  *
  * @param {'connected'|'connecting'|'disconnected'|'idle'} status
  * @returns {Electron.NativeImage}
  */
 function getIcon(status) {
-  const key = COLORS[status] ? status : 'idle';
+  const status_ = COLORS[status] ? status : 'idle';
+  const dark = isDarkTheme();
+  // Cache per status *and* theme — a light taskbar needs a different ring.
+  const key = `${status_}:${dark ? 'dark' : 'light'}`;
   if (variantCache.has(key)) return variantCache.get(key);
+
+  // On a dark taskbar, ring the dot in light; on a light taskbar, ring in dark.
+  const ring = dark ? [245, 246, 248] : [24, 25, 28];
 
   const base = getBaseIcon();
   let composed;
   try {
-    const dot = nativeImage.createFromBuffer(makeDotPng(COLORS[key]));
+    const dot = nativeImage.createFromBuffer(makeDotPng(COLORS[status_], ring));
     // Overlay the dot on top of the base icon.
     composed = compositeOnto(base, dot);
   } catch (err) {

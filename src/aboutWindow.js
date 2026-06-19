@@ -11,9 +11,13 @@ let ipcRegistered = false;
 
 // Only these external URLs may be opened from the About window.
 const ALLOWED_LINKS = {
-  github: 'https://github.com/MacroMaster101/Stremio-Discord-Presence',
+  github: 'https://github.com/MacroMaster101/Stremio_Discord_Rich_Presence',
   discordPortal: 'https://discord.com/developers/applications'
 };
+
+// Live status provider, supplied by main via registerIpc(). Lets the About
+// window show the real Discord/Stremio state instead of static text.
+let statusProvider = () => ({ discordStatus: 'Disconnected', stremioRunning: false });
 
 // Read author/license from package.json once (best-effort).
 let pkg = {};
@@ -33,9 +37,10 @@ function openAboutWindow() {
   }
 
   aboutWindow = new BrowserWindow({
-    width: 420,
-    height: 420,
+    width: 432,
+    height: 472,
     resizable: false,
+    backgroundColor: '#0d0e12',
     minimizable: false,
     maximizable: false,
     fullscreenable: false,
@@ -63,7 +68,8 @@ function openAboutWindow() {
 /**
  * Register IPC handlers for the About window. Safe to call once at startup.
  */
-function registerIpc() {
+function registerIpc(getStatus) {
+  if (typeof getStatus === 'function') statusProvider = getStatus;
   if (ipcRegistered) return;
   ipcRegistered = true;
 
@@ -72,17 +78,20 @@ function registerIpc() {
     try {
       const img = nativeImage
         .createFromPath(path.join(__dirname, '..', 'assets', 'app-icon.png'))
-        .resize({ width: 72, height: 72, quality: 'best' });
+        .resize({ width: 120, height: 120, quality: 'best' });
       iconDataUrl = img.toDataURL();
     } catch (e) {
       iconDataUrl = '';
     }
 
+    const live = statusProvider() || {};
     return {
       version: app.getVersion(),
       author: pkg.author || 'Kavisha Lakshan',
       license: pkg.license || 'MIT',
-      iconDataUrl
+      iconDataUrl,
+      discordStatus: live.discordStatus || 'Disconnected',
+      stremioRunning: !!live.stremioRunning
     };
   });
 

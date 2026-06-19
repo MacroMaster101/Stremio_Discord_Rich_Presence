@@ -55,15 +55,17 @@ let lastTitleState = null;
 let currentPrivacyMode = config.initialPrivacyMode;
 let pollingInterval = null;
 
+// Current live state, surfaced to the About window's status pills.
+let currentDiscordStatus = 'Disconnected';
+let currentStremioRunning = false;
+
 /**
  * Perform a single check of the Stremio process status and update RPC/Tray.
  */
 async function runDetection() {
   try {
     const isRunning = await checkIfStremioRunning();
-    
-    // Update the system tray status text
-    trayManager.updateStremioStatus(isRunning);
+    currentStremioRunning = isRunning;
 
     // Fetch the currently playing media (structured) from Stremio's local server
     let media = null;
@@ -71,6 +73,9 @@ async function runDetection() {
       media = await getPlayingMedia();
     }
     const title = media ? media.display : null;
+
+    // Update the system tray status (running + active title for the menu).
+    trayManager.updateStremioStatus(isRunning, title);
 
     // If running state, privacy mode, or active title changes, update Discord activity
     const runningChanged = isRunning !== lastRunningState;
@@ -107,8 +112,12 @@ async function runDetection() {
 function init() {
   console.log('Stremio Discord Presence starting...');
 
-  // 0. Register IPC handlers for the about window
-  aboutWindow.registerIpc();
+  // 0. Register IPC handlers for the about window, with a live-status provider
+  //    so the About window's pills reflect the real Discord/Stremio state.
+  aboutWindow.registerIpc(() => ({
+    discordStatus: currentDiscordStatus,
+    stremioRunning: currentStremioRunning
+  }));
 
   // 1. Initialize Discord RPC configuration
   discordRpc.setClientId(config.clientId);
@@ -181,8 +190,9 @@ function init() {
 
   // 3. Register status listener to update system tray and trigger immediate updates on connection
   discordRpc.setStatusCallback((status) => {
+    currentDiscordStatus = status;
     trayManager.updateDiscordStatus(status);
-    
+
     if (status === 'Connected') {
       // Reset state tracking to force the next poll to push activity
       lastRunningState = null;
