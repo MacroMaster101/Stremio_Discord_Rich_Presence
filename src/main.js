@@ -153,6 +153,10 @@ function init() {
     onAbout: () => {
       aboutWindow.openAboutWindow();
     },
+    onRestartToUpdate: () => {
+      console.log('User chose to restart and install the downloaded update.');
+      restartToUpdate();
+    },
     onQuit: () => {
       shutdown();
     }
@@ -167,9 +171,12 @@ function init() {
       );
     },
     onUpdateDownloaded: (info) => {
+      // Surface a one-click restart in the tray, and make the toast clickable.
+      trayManager.setUpdateReady(info.version);
       trayManager.showNotification(
         'Update ready',
-        `Version ${info.version} will be installed when you quit the app.`
+        `Version ${info.version} is ready. Click here to restart and update now, or it installs when you quit.`,
+        () => restartToUpdate()
       );
     },
     onNoUpdate: () => {
@@ -215,7 +222,7 @@ function init() {
  */
 function shutdown() {
   console.log('Shutting down Stremio Discord Presence...');
-  
+
   if (pollingInterval) {
     clearInterval(pollingInterval);
     pollingInterval = null;
@@ -223,6 +230,20 @@ function shutdown() {
 
   discordRpc.disconnect();
   app.quit();
+}
+
+/**
+ * Cleanly tear down, then quit and install the downloaded update immediately.
+ * Used by the "Restart to update" tray item and the update notification click.
+ */
+function restartToUpdate() {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
+  }
+  discordRpc.disconnect();
+  // quitAndInstall handles quitting the app and launching the installer.
+  updater.quitAndInstall();
 }
 
 // Electron application lifecycle hooks

@@ -15,6 +15,7 @@ let discordStatus = 'Disconnected';
 let stremioRunning = false;
 let activeTitle = null; // current media title when something is playing, else null
 let privacyMode = false;
+let pendingUpdateVersion = null; // version string when an update is downloaded & ready
 let callbacks = {};
 
 // Emoji indicators keyed by Discord connection status.
@@ -126,7 +127,21 @@ function updateMenu() {
 
   const template = [
     { label: 'Stremio Discord Presence', enabled: false },
-    { type: 'separator' },
+    { type: 'separator' }
+  ];
+
+  // When an update has been downloaded, surface a one-click restart at the top.
+  if (pendingUpdateVersion) {
+    template.push(
+      {
+        label: `⭐  Restart to update (v${pendingUpdateVersion})`,
+        click: () => callbacks.onRestartToUpdate && callbacks.onRestartToUpdate()
+      },
+      { type: 'separator' }
+    );
+  }
+
+  template.push(
     { label: `${discordBadge}  Discord — ${discordStatus}`, enabled: false },
     { label: `${stremioBadge}  Stremio — ${stremioText}`, enabled: false },
     { type: 'separator' },
@@ -192,7 +207,7 @@ function updateMenu() {
         }
       }
     }
-  ];
+  );
 
   tray.setContextMenu(Menu.buildFromTemplate(template));
 }
@@ -234,19 +249,34 @@ function updateStremioStatus(isRunning, title) {
 }
 
 /**
+ * Mark that an update has been downloaded and is ready to install. Adds a
+ * one-click "Restart to update" item to the top of the tray menu.
+ * @param {string|null} version - The pending version, or null to clear it.
+ */
+function setUpdateReady(version) {
+  pendingUpdateVersion = version || null;
+  updateMenu();
+}
+
+/**
  * Show a desktop notification (used for update messages).
  * Falls back silently if notifications aren't supported.
  * @param {string} title
  * @param {string} body
+ * @param {function} [onClick] - Optional handler invoked when the toast is clicked.
  */
-function showNotification(title, body) {
+function showNotification(title, body, onClick) {
   try {
     if (Notification.isSupported()) {
-      new Notification({
+      const n = new Notification({
         title,
         body,
         icon: trayIcon.getIcon('connected')
-      }).show();
+      });
+      if (typeof onClick === 'function') {
+        n.on('click', onClick);
+      }
+      n.show();
     }
   } catch (e) {
     // Non-fatal — notifications are a nicety, not required.
@@ -258,5 +288,6 @@ module.exports = {
   createTray,
   updateDiscordStatus,
   updateStremioStatus,
+  setUpdateReady,
   showNotification
 };
