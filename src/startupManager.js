@@ -21,12 +21,13 @@ const HKCU_STARTUP_APPROVED_RUN_KEY =
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run';
 
 /**
- * Quote a Windows command-line argument when Electron will write it into Run.
+ * Quote a Windows command-line argument for a Run registry command string.
  * @param {string} value
  * @returns {string}
  */
 function quoteArg(value) {
-  return /\s/.test(value) ? '"' + value + '"' : value;
+  const escaped = String(value).replace(/"/g, '\\"');
+  return '"' + escaped + '"';
 }
 
 /**
@@ -36,12 +37,11 @@ function quoteArg(value) {
  * @returns {string[]}
  */
 function getLaunchArgs() {
-  return app.isPackaged ? HIDDEN_ARGS : [quoteArg(app.getAppPath()), ...HIDDEN_ARGS];
+  return app.isPackaged ? HIDDEN_ARGS : [app.getAppPath(), ...HIDDEN_ARGS];
 }
 
 /**
- * Electron requires the same path/args/name for set and get, otherwise
- * getLoginItemSettings().openAtLogin can report the wrong checkbox state.
+ * The executable and args Electron should use for non-Windows login items.
  * @returns {Electron.LoginItemSettingsOptions}
  */
 function getLoginItemOptions() {
@@ -58,19 +58,56 @@ function getLoginItemOptions() {
 }
 
 /**
+ * Command string written to HKCU Run on Windows.
+ * @returns {string}
+ */
+function getWindowsRunCommand() {
+  return [process.execPath, ...getLaunchArgs()].map(quoteArg).join(' ');
+}
+
+/**
+ * Run reg.exe with arguments.
+ * @param {string[]} args
+ * @returns {import('child_process').SpawnSyncReturns<Buffer>}
+ */
+function reg(args) {
+  return spawnSync('reg.exe', args, {
+    windowsHide: true,
+    encoding: 'utf8'
+  });
+}
+
+/**
+ * Whether a registry value exists.
+ * @param {string} key
+ * @param {string} valueName
+ * @returns {boolean}
+ */
+function registryValueExists(key, valueName) {
+  return reg(['query', key, '/v', valueName]).status === 0;
+}
+
+/**
+ * Write a REG_SZ registry value.
+ * @param {string} key
+ * @param {string} valueName
+ * @param {string} value
+ */
+function setRegistryValue(key, valueName, value) {
+  const result = reg(['add', key, '/v', valueName, '/t', 'REG_SZ', '/d', value, '/f']);
+  if (result.status !== 0) {
+    const message = result.stderr || result.stdout || 'unknown registry write error';
+    throw new Error(`Failed to set startup registry value: ${message}`);
+  }
+}
+
+/**
  * Delete a single registry value if it exists. Missing values are fine.
  * @param {string} key
  * @param {string} valueName
  */
 function deleteRegistryValue(key, valueName) {
-  const result = spawnSync('reg.exe', ['delete', key, '/v', valueName, '/f'], {
-    windowsHide: true,
-    stdio: 'ignore'
-  });
-
-  if (result.error) {
-    console.error(`Startup cleanup failed for ${valueName}: ${result.error.message}`);
-  }
+  reg(['delete', key, '/v', valueName, '/f']);
 }
 
 /**
@@ -93,26 +130,15 @@ function cleanupLegacyEntries() {
 function migrateLegacyEntries() {
   if (process.platform !== 'win32') return;
 
-  if (!isEnabled()) {
-    const legacyWasEnabled = LEGACY_STARTUP_NAMES.some((name) => {
-      const settings = app.getLoginItemSettings({
-        ...getLoginItemOptions(),
-        name
-      });
+  const legacyWasEnabled = LEGACY_STARTUP_NAMES.some((name) =>
+    registryValueExists(HKCU_RUN_KEY, name)
+  );
 
-      return settings.openAtLogin;
-    });
-
-    if (legacyWasEnabled) {
-      app.setLoginItemSettings({
-        ...getLoginItemOptions(),
-        openAtLogin: true,
-        enabled: true
-      });
-    }
+  if (!isEnabled() && legacyWasEnabled) {
+    setEnabled(true);
+  } else {
+    cleanupLegacyEntries();
   }
-
-  cleanupLegacyEntries();
 }
 
 /**
@@ -120,22 +146,38 @@ function migrateLegacyEntries() {
  * @returns {boolean}
  */
 function isEnabled() {
+  if (process.platform === 'win32') {
+    return registryValueExists(HKCU_RUN_KEY, STARTUP_NAME);
+  }
+
   return app.getLoginItemSettings(getLoginItemOptions()).openAtLogin;
 }
 
 /**
  * Enable or disable launching the app at login.
  * @param {boolean} enabled
- * @returns {boolean} The state reported by Electron after the update.
+ * @returns {boolean} The state after the update.
  */
 function setEnabled(enabled) {
+  if (process.platform === 'win32') {
+    if (enabled) {
+      setRegistryValue(HKCU_RUN_KEY, STARTUP_NAME, getWindowsRunCommand());
+      deleteRegistryValue(HKCU_STARTUP_APPROVED_RUN_KEY, STARTUP_NAME);
+    } else {
+      deleteRegistryValue(HKCU_RUN_KEY, STARTUP_NAME);
+      deleteRegistryValue(HKCU_STARTUP_APPROVED_RUN_KEY, STARTUP_NAME);
+    }
+
+    cleanupLegacyEntries();
+    return isEnabled();
+  }
+
   app.setLoginItemSettings({
     ...getLoginItemOptions(),
     openAtLogin: enabled,
     enabled
   });
 
-  cleanupLegacyEntries();
   return isEnabled();
 }
 
