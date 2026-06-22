@@ -14,7 +14,7 @@
  *   - The check is silent on "no update" unless triggered manually.
  */
 
-const { app, autoUpdater: _unused } = require('electron');
+const { app } = require('electron');
 let autoUpdater;
 try {
   // Lazy require so a missing dependency in dev doesn't crash the app.
@@ -23,10 +23,40 @@ try {
   autoUpdater = null;
 }
 
+const CHECK_TIMEOUT_MS = 45000;
+
 let initialized = false;
 let manualCheck = false;
+let checkInProgress = false;
+let checkTimeout = null;
 // Optional callbacks supplied by main (e.g. to update tray state/notifications).
 let notify = {};
+
+function clearCheckTimeout() {
+  if (!checkTimeout) return;
+  clearTimeout(checkTimeout);
+  checkTimeout = null;
+}
+
+function finishCheck() {
+  clearCheckTimeout();
+  checkInProgress = false;
+  manualCheck = false;
+}
+
+function startCheckTimeout() {
+  clearCheckTimeout();
+  checkTimeout = setTimeout(() => {
+    const err = new Error('Update check timed out. Please try again later.');
+    console.warn(`Updater timeout: ${err.message}`);
+    if (manualCheck && notify.onError) notify.onError(err);
+    finishCheck();
+  }, CHECK_TIMEOUT_MS);
+
+  if (typeof checkTimeout.unref === 'function') {
+    checkTimeout.unref();
+  }
+}
 
 /**
  * Wire up the updater. Safe to call once at startup.
@@ -50,6 +80,8 @@ function init(callbacks = {}) {
 
   autoUpdater.on('update-available', (info) => {
     console.log(`Updater: update available -> ${info.version}`);
+    clearCheckTimeout();
+    checkInProgress = false;
     if (notify.onUpdateAvailable) notify.onUpdateAvailable(info);
   });
 
@@ -59,20 +91,22 @@ function init(callbacks = {}) {
 
   autoUpdater.on('update-not-available', () => {
     console.log('Updater: no update available.');
-    if (manualCheck && notify.onNoUpdate) notify.onNoUpdate();
-    manualCheck = false;
+    const wasManual = manualCheck;
+    finishCheck();
+    if (wasManual && notify.onNoUpdate) notify.onNoUpdate();
   });
 
   autoUpdater.on('update-downloaded', (info) => {
     console.log(`Updater: update downloaded -> ${info.version} (ready to install)`);
-    manualCheck = false;
+    finishCheck();
     if (notify.onUpdateDownloaded) notify.onUpdateDownloaded(info);
   });
 
   autoUpdater.on('error', (err) => {
     console.error(`Updater error: ${err == null ? 'unknown' : (err.message || err)}`);
-    if (manualCheck && notify.onError) notify.onError(err);
-    manualCheck = false;
+    const wasManual = manualCheck;
+    finishCheck();
+    if (wasManual && notify.onError) notify.onError(err);
   });
 }
 
@@ -88,10 +122,20 @@ function checkForUpdates(isManual = false) {
     return;
   }
 
+  if (checkInProgress) {
+    manualCheck = manualCheck || isManual;
+    return;
+  }
+
   manualCheck = isManual;
+  checkInProgress = true;
+  startCheckTimeout();
+
   autoUpdater.checkForUpdates().catch((err) => {
     console.error(`Updater check failed: ${err.message}`);
-    if (isManual && notify.onError) notify.onError(err);
+    const wasManual = manualCheck;
+    finishCheck();
+    if (wasManual && notify.onError) notify.onError(err);
   });
 }
 

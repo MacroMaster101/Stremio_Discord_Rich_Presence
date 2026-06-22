@@ -159,8 +159,10 @@ function getUpdateStatusLabel() {
     }
     case 'ready':
       return `Restart to update${updateStatus.version ? ` (v${updateStatus.version})` : ''}`;
+    case 'installing':
+      return `Restarting to update${updateStatus.version ? ` (v${updateStatus.version})` : ''}…`;
     case 'error':
-      return 'Update check failed';
+      return 'Update failed - Try again';
     default:
       return null;
   }
@@ -177,8 +179,19 @@ function getUpdateActionItem() {
     };
   }
 
-  if (updateStatus.state === 'checking' || updateStatus.state === 'downloading') {
+  if (updateStatus.state === 'checking' || updateStatus.state === 'downloading' || updateStatus.state === 'installing') {
     return { label, enabled: false };
+  }
+
+  if (updateStatus.state === 'error') {
+    return {
+      label,
+      click: () => {
+        manualUpdateMenuActive = true;
+        reopenMenuSoon(true);
+        if (callbacks.onCheckForUpdates) callbacks.onCheckForUpdates();
+      }
+    };
   }
 
   return {

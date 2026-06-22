@@ -178,13 +178,13 @@ function init() {
       trayManager.setUpdateStatus({ state: 'downloading', percent: progress.percent });
     },
     onUpdateDownloaded: (info) => {
-      // Surface a one-click silent restart in the tray, and make the toast clickable.
-      trayManager.setUpdateReady(info.version);
+      trayManager.setUpdateStatus({ state: 'installing', version: info.version });
       trayManager.showNotification(
-        'Update ready',
-        `Version ${info.version} is ready. Click here to restart and update now.`,
+        'Update downloaded',
+        `Version ${info.version} is ready. Restarting to update now.`,
         () => restartToUpdate()
       );
+      setTimeout(() => restartToUpdate(), 2500);
     },
     onNoUpdate: () => {
       trayManager.setUpdateStatus({ state: 'idle' });
