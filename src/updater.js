@@ -4,8 +4,9 @@
  *
  * Behavior:
  *   - On launch (and on manual "Check for Updates"), checks GitHub Releases.
- *   - If a newer version exists, downloads it in the background and notifies
- *     the user. The update installs automatically the next time the app quits.
+ *   - If a newer version exists, downloads it in the background and reports
+ *     download progress to the tray.
+ *   - Once downloaded, the tray exposes a one-click silent restart/update.
  *
  * Notes:
  *   - Updates only work in the packaged app; in development the updater is a
@@ -24,13 +25,15 @@ try {
 
 let initialized = false;
 let manualCheck = false;
-// Optional callbacks supplied by main (e.g. to show tray notifications).
+// Optional callbacks supplied by main (e.g. to update tray state/notifications).
 let notify = {};
 
 /**
  * Wire up the updater. Safe to call once at startup.
  * @param {object} callbacks
+ * @param {function} [callbacks.onChecking] - ({ manual }) => void
  * @param {function} [callbacks.onUpdateAvailable] - (info) => void
+ * @param {function} [callbacks.onDownloadProgress] - (progress) => void
  * @param {function} [callbacks.onUpdateDownloaded] - (info) => void
  * @param {function} [callbacks.onNoUpdate] - () => void   (only fired on manual checks)
  * @param {function} [callbacks.onError] - (err) => void   (only surfaced on manual checks)
@@ -40,13 +43,18 @@ function init(callbacks = {}) {
   if (initialized || !autoUpdater) return;
   initialized = true;
 
-  // Download automatically, but install only on quit (least disruptive).
+  // Download automatically, but only install when the user chooses restart or
+  // when the app quits. quitAndInstall() below uses silent install + relaunch.
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on('update-available', (info) => {
     console.log(`Updater: update available -> ${info.version}`);
     if (notify.onUpdateAvailable) notify.onUpdateAvailable(info);
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    if (notify.onDownloadProgress) notify.onDownloadProgress(progress);
   });
 
   autoUpdater.on('update-not-available', () => {
@@ -56,7 +64,8 @@ function init(callbacks = {}) {
   });
 
   autoUpdater.on('update-downloaded', (info) => {
-    console.log(`Updater: update downloaded -> ${info.version} (installs on quit)`);
+    console.log(`Updater: update downloaded -> ${info.version} (ready to install)`);
+    manualCheck = false;
     if (notify.onUpdateDownloaded) notify.onUpdateDownloaded(info);
   });
 
@@ -72,10 +81,13 @@ function init(callbacks = {}) {
  * @param {boolean} isManual - True when triggered by the user ("Check for Updates").
  */
 function checkForUpdates(isManual = false) {
+  if (notify.onChecking) notify.onChecking({ manual: isManual });
+
   if (!autoUpdater || !app.isPackaged) {
     if (isManual && notify.onNoUpdate) notify.onNoUpdate();
     return;
   }
+
   manualCheck = isManual;
   autoUpdater.checkForUpdates().catch((err) => {
     console.error(`Updater check failed: ${err.message}`);
@@ -84,11 +96,10 @@ function checkForUpdates(isManual = false) {
 }
 
 /**
- * Quit and install a downloaded update immediately (used if the user opts to
- * restart now). Safe to call only after 'update-downloaded'.
+ * Silently install a downloaded update and relaunch the app.
  */
 function quitAndInstall() {
-  if (autoUpdater) autoUpdater.quitAndInstall();
+  if (autoUpdater) autoUpdater.quitAndInstall(true, true);
 }
 
 module.exports = {

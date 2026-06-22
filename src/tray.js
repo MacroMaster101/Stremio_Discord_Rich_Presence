@@ -15,7 +15,7 @@ let discordStatus = 'Disconnected';
 let stremioRunning = false;
 let activeTitle = null; // current media title when something is playing, else null
 let privacyMode = false;
-let pendingUpdateVersion = null; // version string when an update is downloaded & ready
+let updateStatus = { state: 'idle', version: null, percent: null };
 let callbacks = {};
 
 // Emoji indicators keyed by Discord connection status.
@@ -38,6 +38,7 @@ const DISCORD_BADGE = {
  * @param {function} [eventCallbacks.arePostersEnabled] - Returns current posters-enabled boolean.
  * @param {function} [eventCallbacks.isPosterFeatureAvailable] - Returns whether poster lookups are available.
  * @param {function} [eventCallbacks.onCheckForUpdates] - "Check for Updates…" click.
+ * @param {function} [eventCallbacks.onRestartToUpdate] - "Restart to update" click.
  * @param {function} eventCallbacks.onAbout - "About" click.
  * @param {function} eventCallbacks.onQuit - "Quit" click.
  * @param {function} [eventCallbacks.isAutoStartEnabled] - Returns current autostart boolean.
@@ -103,6 +104,47 @@ function posterFeatureAvailable() {
     : false;
 }
 
+/** @returns {string|null} Human-readable update state for the menu. */
+function getUpdateStatusLabel() {
+  switch (updateStatus.state) {
+    case 'checking':
+      return 'Checking for updates…';
+    case 'downloading': {
+      const percent = Number.isFinite(updateStatus.percent)
+        ? ` ${Math.max(0, Math.min(100, Math.round(updateStatus.percent)))}%`
+        : '';
+      return `Downloading update${percent}…`;
+    }
+    case 'ready':
+      return `Restart to update${updateStatus.version ? ` (v${updateStatus.version})` : ''}`;
+    case 'error':
+      return 'Update check failed';
+    default:
+      return null;
+  }
+}
+
+/** @returns {Electron.MenuItemConstructorOptions} */
+function getUpdateActionItem() {
+  const label = getUpdateStatusLabel();
+
+  if (updateStatus.state === 'ready') {
+    return {
+      label,
+      click: () => callbacks.onRestartToUpdate && callbacks.onRestartToUpdate()
+    };
+  }
+
+  if (updateStatus.state === 'checking' || updateStatus.state === 'downloading') {
+    return { label, enabled: false };
+  }
+
+  return {
+    label: 'Check for Updates…',
+    click: () => callbacks.onCheckForUpdates && callbacks.onCheckForUpdates()
+  };
+}
+
 /**
  * Re-builds and updates the system tray context menu to reflect the latest status.
  */
@@ -130,13 +172,15 @@ function updateMenu() {
     { type: 'separator' }
   ];
 
-  // When an update has been downloaded, surface a one-click restart at the top.
-  if (pendingUpdateVersion) {
+  const updateLabel = getUpdateStatusLabel();
+  if (updateLabel) {
     template.push(
-      {
-        label: `⭐  Restart to update (v${pendingUpdateVersion})`,
-        click: () => callbacks.onRestartToUpdate && callbacks.onRestartToUpdate()
-      },
+      updateStatus.state === 'ready'
+        ? {
+            label: `⭐  ${updateLabel}`,
+            click: () => callbacks.onRestartToUpdate && callbacks.onRestartToUpdate()
+          }
+        : { label: updateLabel, enabled: false },
       { type: 'separator' }
     );
   }
@@ -189,10 +233,7 @@ function updateMenu() {
       label: 'Reconnect Discord',
       click: () => callbacks.onReconnect && callbacks.onReconnect()
     },
-    {
-      label: 'Check for Updates…',
-      click: () => callbacks.onCheckForUpdates && callbacks.onCheckForUpdates()
-    },
+    getUpdateActionItem(),
     {
       label: 'About',
       click: () => callbacks.onAbout && callbacks.onAbout()
@@ -250,13 +291,33 @@ function updateStremioStatus(isRunning, title) {
 }
 
 /**
+ * Update tray-visible updater state.
+ * @param {{state?: string, version?: string|null, percent?: number|null}} status
+ */
+function setUpdateStatus(status = {}) {
+  updateStatus = {
+    state: status.state || 'idle',
+    version: Object.prototype.hasOwnProperty.call(status, 'version')
+      ? status.version
+      : updateStatus.version,
+    percent: Number.isFinite(status.percent) ? status.percent : null
+  };
+
+  if (updateStatus.state === 'idle' || updateStatus.state === 'error') {
+    updateStatus.version = updateStatus.state === 'idle' ? null : updateStatus.version;
+    updateStatus.percent = null;
+  }
+
+  updateMenu();
+}
+
+/**
  * Mark that an update has been downloaded and is ready to install. Adds a
  * one-click "Restart to update" item to the top of the tray menu.
  * @param {string|null} version - The pending version, or null to clear it.
  */
 function setUpdateReady(version) {
-  pendingUpdateVersion = version || null;
-  updateMenu();
+  setUpdateStatus({ state: version ? 'ready' : 'idle', version: version || null });
 }
 
 /**
@@ -289,6 +350,7 @@ module.exports = {
   createTray,
   updateDiscordStatus,
   updateStremioStatus,
+  setUpdateStatus,
   setUpdateReady,
   showNotification
 };

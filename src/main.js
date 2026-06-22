@@ -148,7 +148,6 @@ function init() {
     isPosterFeatureAvailable: () => cinemeta.isAvailable(),
     onCheckForUpdates: () => {
       console.log('User requested a manual update check.');
-      trayManager.showNotification('Stremio Discord Presence', 'Checking for updates…');
       updater.checkForUpdates(true);
     },
     onAbout: () => {
@@ -165,28 +164,40 @@ function init() {
 
   // 2b. Initialize the auto-updater and check on launch.
   updater.init({
+    onChecking: ({ manual }) => {
+      trayManager.setUpdateStatus({ state: 'checking' });
+      if (manual) {
+        trayManager.showNotification('Stremio Discord Presence', 'Checking for updates...');
+      }
+    },
     onUpdateAvailable: (info) => {
+      trayManager.setUpdateStatus({ state: 'downloading', version: info.version, percent: 0 });
       trayManager.showNotification(
         'Update available',
-        `Downloading version ${info.version} in the background…`
+        `Downloading version ${info.version} in the background...`
       );
     },
+    onDownloadProgress: (progress) => {
+      trayManager.setUpdateStatus({ state: 'downloading', percent: progress.percent });
+    },
     onUpdateDownloaded: (info) => {
-      // Surface a one-click restart in the tray, and make the toast clickable.
+      // Surface a one-click silent restart in the tray, and make the toast clickable.
       trayManager.setUpdateReady(info.version);
       trayManager.showNotification(
         'Update ready',
-        `Version ${info.version} is ready. Click here to restart and update now, or it installs when you quit.`,
+        `Version ${info.version} is ready. Click here to restart and update now.`,
         () => restartToUpdate()
       );
     },
     onNoUpdate: () => {
+      trayManager.setUpdateStatus({ state: 'idle' });
       trayManager.showNotification(
         'Stremio Discord Presence',
-        'You’re already on the latest version.'
+        'You are already on the latest version.'
       );
     },
     onError: () => {
+      trayManager.setUpdateStatus({ state: 'error' });
       trayManager.showNotification(
         'Update check failed',
         'Could not check for updates. Please try again later.'

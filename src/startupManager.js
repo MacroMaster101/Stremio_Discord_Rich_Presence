@@ -9,6 +9,8 @@ const { spawnSync } = require('child_process');
 
 const STARTUP_NAME = 'Stremio Discord Presence';
 const HIDDEN_ARGS = ['--hidden'];
+const STARTUP_APPROVED_ENABLED = '020000000000000000000000';
+const STARTUP_APPROVED_DISABLED = '030000000000000000000000';
 
 const LEGACY_STARTUP_NAMES = [
   'electron.app.Stremio Discord Presence',
@@ -66,9 +68,18 @@ function getWindowsRunCommand() {
 }
 
 /**
+ * Escape text for a RegExp literal.
+ * @param {string} value
+ * @returns {string}
+ */
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Run reg.exe with arguments.
  * @param {string[]} args
- * @returns {import('child_process').SpawnSyncReturns<Buffer>}
+ * @returns {import('child_process').SpawnSyncReturns<string>}
  */
 function reg(args) {
   return spawnSync('reg.exe', args, {
@@ -88,16 +99,45 @@ function registryValueExists(key, valueName) {
 }
 
 /**
+ * Read a REG_BINARY registry value as a compact hex string.
+ * @param {string} key
+ * @param {string} valueName
+ * @returns {string|null}
+ */
+function getRegistryBinaryValue(key, valueName) {
+  const result = reg(['query', key, '/v', valueName]);
+  if (result.status !== 0) return null;
+
+  const pattern = new RegExp(`${escapeRegExp(valueName)}\\s+REG_BINARY\\s+([0-9a-fA-F]+)`, 'i');
+  const match = result.stdout.match(pattern);
+  return match ? match[1].toLowerCase() : null;
+}
+
+/**
  * Write a REG_SZ registry value.
  * @param {string} key
  * @param {string} valueName
  * @param {string} value
  */
-function setRegistryValue(key, valueName, value) {
+function setRegistryStringValue(key, valueName, value) {
   const result = reg(['add', key, '/v', valueName, '/t', 'REG_SZ', '/d', value, '/f']);
   if (result.status !== 0) {
     const message = result.stderr || result.stdout || 'unknown registry write error';
     throw new Error(`Failed to set startup registry value: ${message}`);
+  }
+}
+
+/**
+ * Write a REG_BINARY registry value.
+ * @param {string} key
+ * @param {string} valueName
+ * @param {string} value
+ */
+function setRegistryBinaryValue(key, valueName, value) {
+  const result = reg(['add', key, '/v', valueName, '/t', 'REG_BINARY', '/d', value, '/f']);
+  if (result.status !== 0) {
+    const message = result.stderr || result.stdout || 'unknown registry write error';
+    throw new Error(`Failed to set startup approval value: ${message}`);
   }
 }
 
@@ -108,6 +148,12 @@ function setRegistryValue(key, valueName, value) {
  */
 function deleteRegistryValue(key, valueName) {
   reg(['delete', key, '/v', valueName, '/f']);
+}
+
+/** @returns {boolean} */
+function isWindowsStartupApprovedDisabled() {
+  const value = getRegistryBinaryValue(HKCU_STARTUP_APPROVED_RUN_KEY, STARTUP_NAME);
+  return value ? value.startsWith('03') : false;
 }
 
 /**
@@ -147,7 +193,7 @@ function migrateLegacyEntries() {
  */
 function isEnabled() {
   if (process.platform === 'win32') {
-    return registryValueExists(HKCU_RUN_KEY, STARTUP_NAME);
+    return registryValueExists(HKCU_RUN_KEY, STARTUP_NAME) && !isWindowsStartupApprovedDisabled();
   }
 
   return app.getLoginItemSettings(getLoginItemOptions()).openAtLogin;
@@ -160,13 +206,12 @@ function isEnabled() {
  */
 function setEnabled(enabled) {
   if (process.platform === 'win32') {
-    if (enabled) {
-      setRegistryValue(HKCU_RUN_KEY, STARTUP_NAME, getWindowsRunCommand());
-      deleteRegistryValue(HKCU_STARTUP_APPROVED_RUN_KEY, STARTUP_NAME);
-    } else {
-      deleteRegistryValue(HKCU_RUN_KEY, STARTUP_NAME);
-      deleteRegistryValue(HKCU_STARTUP_APPROVED_RUN_KEY, STARTUP_NAME);
-    }
+    setRegistryStringValue(HKCU_RUN_KEY, STARTUP_NAME, getWindowsRunCommand());
+    setRegistryBinaryValue(
+      HKCU_STARTUP_APPROVED_RUN_KEY,
+      STARTUP_NAME,
+      enabled ? STARTUP_APPROVED_ENABLED : STARTUP_APPROVED_DISABLED
+    );
 
     cleanupLegacyEntries();
     return isEnabled();
