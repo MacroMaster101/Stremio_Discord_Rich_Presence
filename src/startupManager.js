@@ -206,6 +206,15 @@ function isEnabled() {
  */
 function setEnabled(enabled) {
   if (process.platform === 'win32') {
+    if (app.isPackaged) {
+      app.setLoginItemSettings({
+        ...getLoginItemOptions(),
+        // Keep the Task Manager row present; enabled controls the Status column.
+        openAtLogin: true,
+        enabled
+      });
+    }
+
     setRegistryStringValue(HKCU_RUN_KEY, STARTUP_NAME, getWindowsRunCommand());
     setRegistryBinaryValue(
       HKCU_STARTUP_APPROVED_RUN_KEY,

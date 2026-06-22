@@ -165,10 +165,7 @@ function init() {
   // 2b. Initialize the auto-updater and check on launch.
   updater.init({
     onChecking: ({ manual }) => {
-      trayManager.setUpdateStatus({ state: 'checking' });
-      if (manual) {
-        trayManager.showNotification('Stremio Discord Presence', 'Checking for updates...');
-      }
+      trayManager.setUpdateStatus({ state: 'checking', showMenu: manual });
     },
     onUpdateAvailable: (info) => {
       trayManager.setUpdateStatus({ state: 'downloading', version: info.version, percent: 0 });

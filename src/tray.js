@@ -16,6 +16,9 @@ let stremioRunning = false;
 let activeTitle = null; // current media title when something is playing, else null
 let privacyMode = false;
 let updateStatus = { state: 'idle', version: null, percent: null };
+let manualUpdateMenuActive = false;
+let lastUpdateMenuPopupAt = 0;
+let lastUpdateMenuPopupPercent = -1;
 let callbacks = {};
 
 // Emoji indicators keyed by Discord connection status.
@@ -104,6 +107,44 @@ function posterFeatureAvailable() {
     : false;
 }
 
+/**
+ * Reopen the native tray menu shortly after a click closes it. Native Windows
+ * context menus cannot stay open after an item is clicked, so this gives users
+ * immediate visual feedback for long-running update checks/downloads.
+ * @param {boolean} [force]
+ */
+function reopenMenuSoon(force = false) {
+  if (!tray) return;
+
+  const now = Date.now();
+  if (!force && now - lastUpdateMenuPopupAt < 1500) return;
+  lastUpdateMenuPopupAt = now;
+
+  setTimeout(() => {
+    if (tray) tray.popUpContextMenu();
+  }, 160);
+}
+
+/**
+ * Decide whether to reopen the tray menu after update status changes.
+ * @param {string} previousState
+ * @param {number|null} previousPercent
+ * @param {boolean} force
+ */
+function maybeReopenForUpdate(previousState, previousPercent, force) {
+  if (!manualUpdateMenuActive && !force) return;
+
+  if (updateStatus.state === 'downloading') {
+    const percent = Number.isFinite(updateStatus.percent)
+      ? Math.round(updateStatus.percent)
+      : null;
+    const crossedStep = percent !== null && Math.floor(percent / 20) > Math.floor((previousPercent || 0) / 20);
+    if (!force && previousState === 'downloading' && !crossedStep) return;
+    lastUpdateMenuPopupPercent = percent == null ? lastUpdateMenuPopupPercent : percent;
+  }
+
+  reopenMenuSoon(force || updateStatus.state !== previousState);
+}
 /** @returns {string|null} Human-readable update state for the menu. */
 function getUpdateStatusLabel() {
   switch (updateStatus.state) {
@@ -141,7 +182,11 @@ function getUpdateActionItem() {
 
   return {
     label: 'Check for Updates…',
-    click: () => callbacks.onCheckForUpdates && callbacks.onCheckForUpdates()
+    click: () => {
+      manualUpdateMenuActive = true;
+      reopenMenuSoon(true);
+      if (callbacks.onCheckForUpdates) callbacks.onCheckForUpdates();
+    }
   };
 }
 
@@ -295,6 +340,13 @@ function updateStremioStatus(isRunning, title) {
  * @param {{state?: string, version?: string|null, percent?: number|null}} status
  */
 function setUpdateStatus(status = {}) {
+  const previousState = updateStatus.state;
+  const previousPercent = updateStatus.percent;
+
+  if (status.showMenu) {
+    manualUpdateMenuActive = true;
+  }
+
   updateStatus = {
     state: status.state || 'idle',
     version: Object.prototype.hasOwnProperty.call(status, 'version')
@@ -308,7 +360,12 @@ function setUpdateStatus(status = {}) {
     updateStatus.percent = null;
   }
 
+  if (updateStatus.state === 'ready' || updateStatus.state === 'idle' || updateStatus.state === 'error') {
+    manualUpdateMenuActive = status.showMenu || manualUpdateMenuActive;
+  }
+
   updateMenu();
+  maybeReopenForUpdate(previousState, previousPercent, !!status.showMenu);
 }
 
 /**
