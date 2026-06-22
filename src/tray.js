@@ -145,6 +145,7 @@ function maybeReopenForUpdate(previousState, previousPercent, force) {
 
   reopenMenuSoon(force || updateStatus.state !== previousState);
 }
+
 /** @returns {string|null} Human-readable update state for the menu. */
 function getUpdateStatusLabel() {
   switch (updateStatus.state) {
@@ -216,19 +217,6 @@ function updateMenu() {
     { label: 'Stremio Discord Presence', enabled: false },
     { type: 'separator' }
   ];
-
-  const updateLabel = getUpdateStatusLabel();
-  if (updateLabel) {
-    template.push(
-      updateStatus.state === 'ready'
-        ? {
-            label: `⭐  ${updateLabel}`,
-            click: () => callbacks.onRestartToUpdate && callbacks.onRestartToUpdate()
-          }
-        : { label: updateLabel, enabled: false },
-      { type: 'separator' }
-    );
-  }
 
   template.push(
     { label: `${discordBadge}  Discord — ${discordStatus}`, enabled: false },
@@ -360,17 +348,18 @@ function setUpdateStatus(status = {}) {
     updateStatus.percent = null;
   }
 
-  if (updateStatus.state === 'ready' || updateStatus.state === 'idle' || updateStatus.state === 'error') {
-    manualUpdateMenuActive = status.showMenu || manualUpdateMenuActive;
-  }
 
   updateMenu();
   maybeReopenForUpdate(previousState, previousPercent, !!status.showMenu);
+
+  if (updateStatus.state === 'idle' || updateStatus.state === 'error' || updateStatus.state === 'ready') {
+    manualUpdateMenuActive = false;
+  }
 }
 
 /**
  * Mark that an update has been downloaded and is ready to install. Adds a
- * one-click "Restart to update" item to the top of the tray menu.
+ * one-click "Restart to update" item in the update action row.
  * @param {string|null} version - The pending version, or null to clear it.
  */
 function setUpdateReady(version) {
