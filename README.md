@@ -59,7 +59,7 @@ A status dot (🟢 connected · 🟡 connecting · 🔴 disconnected) with an ou
 Optional toggle to launch minimized at login — and it shows up in Task Manager's Startup tab.
 
 🔄 **Auto-updates**
-Checks GitHub for new versions, downloads in the background, and offers a one-click **Restart to update** from the tray.
+Checks GitHub for new versions, shows tray progress, downloads in the background, and restarts automatically when ready.
 
 🔁 **Bulletproof reconnect**
 Handles Discord not running at startup, or being closed and reopened — it just reconnects.
@@ -74,7 +74,7 @@ Handles Discord not running at startup, or being closed and reopened — it just
 
 ### Option A — Installer *(recommended for most users)*
 
-1. Download **`Stremio Discord Presence Setup x.x.x.exe`** from the **[Releases](https://github.com/MacroMaster101/Stremio_Discord_Rich_Presence/releases)** page.
+1. Download **`Stremio-Discord-Presence-Setup-x.x.x.exe`** from the **[Releases](https://github.com/MacroMaster101/Stremio_Discord_Rich_Presence/releases)** page.
 2. Run it and follow the wizard — pick your install location. On the final step you can tick **Create a desktop shortcut** (a Start Menu shortcut is always added).
 3. Launch the app — it appears in your system tray and connects to Discord automatically.
 
@@ -104,7 +104,7 @@ Look for the Stremio Discord Presence icon in your Windows system tray (near the
 - 🚀 Toggle **Start with Windows** (launches minimized at login)
 - 🖼️ Toggle **Show Poster Art**
 - 🔁 **Reconnect Discord** manually
-- 🔄 **Check for Updates** — and **Restart to update** when one is ready
+- 🔄 **Check for Updates** — shows checking/download/retry status in the tray and auto-restarts when ready
 - ℹ️ Open **About** for version info and links
 - ❌ **Quit** the application
 
@@ -173,7 +173,7 @@ stremio-discord-presence/
 ├── RELEASING.md            # How to build & publish a release
 ├── .env.example            # Environment variables template
 ├── build/
-│   └── installer.nsh       # Custom NSIS: desktop-shortcut checkbox on install
+│   └── installer.nsh       # Custom NSIS: desktop shortcut choice + startup cleanup
 ├── assets/
 │   ├── app-icon.ico        # Windows executable / installer icon
 │   ├── app-icon.png        # App window & About icon
@@ -209,6 +209,28 @@ stremio-discord-presence/
 </details>
 
 <details>
+<summary><b>Start with Windows looks wrong in Task Manager</b></summary>
+
+<br/>
+
+- Toggle **Start with Windows** from the tray menu once. The app keeps the Windows `Run` entry and Task Manager's Startup state in sync, so disabled should show as **Disabled** instead of leaving a broken leftover entry.
+- Close and reopen Task Manager if it still shows the old state — Windows can cache the Startup apps list.
+- If you installed an older build before the startup cleanup fixes, install the latest release once so the installer/uninstaller can clean old startup names.
+
+</details>
+
+<details>
+<summary><b>"Check for Updates" stays on checking</b></summary>
+
+<br/>
+
+- Auto-update only works in the packaged installer build, not while running from source with `npm start`.
+- Make sure the GitHub Release is published and includes all three files: `.exe`, `.exe.blockmap`, and `latest.yml`.
+- If GitHub or the network does not respond, the tray changes to **Update failed - Try again** after a timeout instead of staying stuck.
+- When an update is found, the app downloads it, shows progress in the tray, then restarts automatically to install it.
+
+</details>
+<details>
 <summary><b>Stremio status not updating</b></summary>
 
 <br/>
@@ -229,7 +251,7 @@ The app is packaged with [electron-builder](https://www.electron.build/), alread
 # Build a portable folder (dist/win-unpacked/) containing the .exe
 npm run pack
 
-# Build a Windows installer (dist/Stremio Discord Presence Setup x.x.x.exe)
+# Build a Windows installer (dist/Stremio-Discord-Presence-Setup-x.x.x.exe)
 npm run dist
 ```
 
@@ -248,13 +270,14 @@ npm run dist
 **Recently shipped ✅**
 
 - 🟣 **Browsing state** — shows *"Browsing Stremio"* when idle, switching to the title on playback.
-- 🔄 **Auto-updates** — background download with a one-click **Restart to update** from the tray.
+- 🔄 **Auto-updates** — tray progress, background download, and automatic restart/install when ready.
 - 🎨 **Redesigned About window** and a **theme-aware tray icon** that adapts to light/dark taskbars.
 - 🖥️ **Desktop-shortcut choice** — an opt-in checkbox on the installer's final step.
 - 📺 **Rich title parsing** — series name with `SxxExx` + episode title, or movie name and year.
 - 🖼️ **Poster artwork** — real posters from Stremio's Cinemeta addon (no API key) with a Stremio badge overlay.
 - 🔘 **Presence buttons** — "Get Stremio" and "Search Title" on the Rich Presence card.
-- 🚀 **Launch on Startup** — run minimized at Windows login.
+- 🚀 **Launch on Startup** — run minimized at Windows login, with Task Manager startup state kept in sync.
+- 🧹 **Uninstall cleanup** — removes Windows Startup leftovers when the app is uninstalled.
 - 🟢 **Built-in Discord application** — works with zero setup.
 
 ---

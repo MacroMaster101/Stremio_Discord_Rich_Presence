@@ -8,151 +8,162 @@ GitHub Release so users can download it **and** receive automatic in-app updates
 > [`package.json`](package.json)). For auto-update to work, every release **must** include
 > the `.exe` **plus** the auto-generated `latest.yml` and `.blockmap` files.
 
+> ✨ Release files are intentionally hyphenated, like
+> `Stremio-Discord-Presence-Setup-1.0.8.exe`, so GitHub assets and `latest.yml` match.
+
 ---
 
 ## ✅ Prerequisites (one-time)
 
 - [Node.js](https://nodejs.org/) v18+ installed.
 - Dependencies installed: `npm install`.
-- A clean working tree (commit your changes first).
+- GitHub CLI installed: `winget install --id GitHub.cli`.
+- Logged in to GitHub CLI: `gh auth login`.
+- A clean working tree before you start the release.
 - **Developer Mode ON** (Settings → Privacy & security → For developers) *or* run your
-  terminal **as Administrator** — the NSIS installer build creates symbolic links.
+  terminal **as Administrator** — the NSIS installer build can create symbolic links.
+
+> 💡 If PowerShell says `gh` is not recognized after installing GitHub CLI, restart VS Code
+> or PowerShell. You can also run it directly with
+> `& "C:\Program Files\GitHub CLI\gh.exe"`.
 
 ---
 
 ## 1️⃣ Bump the version
 
-`electron-updater` decides whether an update is available by comparing the `version` in
-`package.json` against the latest GitHub Release. **Bump it before every release.**
+`electron-updater` decides whether an update is available by comparing the app version
+against the latest GitHub Release. **Bump it before every release.**
 
-Edit [`package.json`](package.json):
+For a patch release:
 
-```jsonc
-{
-  "version": "1.0.1"   // was 1.0.0
-}
+```powershell
+npm version patch --no-git-tag-version
 ```
 
+Or set an exact version:
+
+```powershell
+npm version 1.0.8 --no-git-tag-version
+```
+
+This updates both [`package.json`](package.json) and [`package-lock.json`](package-lock.json).
 Use [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
-(e.g. `1.0.0` → `1.0.1` for a bug fix, `1.1.0` for a feature).
+(e.g. `1.0.7` → `1.0.8` for a bug fix, `1.1.0` for a feature).
 
 ---
 
 ## 2️⃣ Build the installer
 
-There are two ways to publish. **Pick one.**
-
-### Option A — Let electron-builder publish automatically *(recommended)*
-
-This builds the installer **and** uploads everything (`.exe`, `latest.yml`, `.blockmap`)
-to a GitHub Release in one command — no manual file juggling, and auto-update "just works".
-
-1. Create a **GitHub Personal Access Token** with `repo` scope:
-   [github.com/settings/tokens](https://github.com/settings/tokens) → *Generate new token (classic)* → check **repo**.
-
-2. Set it as an environment variable, then publish:
-
-   **PowerShell**
-   ```powershell
-   $env:GH_TOKEN = "ghp_your_token_here"
-   npx electron-builder --win --publish always
-   ```
-
-   **Git Bash**
-   ```bash
-   export GH_TOKEN="ghp_your_token_here"
-   npx electron-builder --win --publish always
-   ```
-
-3. electron-builder creates a **draft release** tagged `v1.0.1` on GitHub with all assets
-   attached. Go to the repo's **Releases** page, add release notes, and click **Publish release**.
-
-> ✨ With this option you can skip steps 3 and 4 below.
-
-### Option B — Build locally, upload manually
-
-```bash
+```powershell
 npm run dist
 ```
 
-This produces these files in the `dist/` folder:
+This produces the release assets in `dist/`:
 
-| File                                          | Purpose                                  |
-| --------------------------------------------- | ---------------------------------------- |
-| `Stremio Discord Presence Setup 1.0.1.exe`    | The installer users download             |
-| `Stremio Discord Presence Setup 1.0.1.exe.blockmap` | Enables fast differential updates  |
-| `latest.yml`                                  | **Required** — tells the app what's newest |
+| File | Purpose |
+| ---- | ------- |
+| `Stremio-Discord-Presence-Setup-1.0.8.exe` | The installer users download |
+| `Stremio-Discord-Presence-Setup-1.0.8.exe.blockmap` | Enables fast differential updates |
+| `latest.yml` | **Required** — tells the app what's newest |
 
-> ⚠️ All three files must be uploaded to the release. If `latest.yml` is missing, auto-update breaks.
+> ⚠️ Upload all three files. If `latest.yml` is missing or points to a different filename,
+> auto-update breaks.
 
-> 💡 GitHub uploads file names with spaces as hyphens, so the `.exe` lands as
-> `Stremio-Discord-Presence-Setup-x.x.x.exe` — which is exactly what `latest.yml`
-> references. If you upload manually, rename the `.exe` and `.blockmap` to the
-> hyphenated form first so the names match `latest.yml`.
+> 🧹 `electron-builder` may also create `dist/win-unpacked/`. That's useful for local testing,
+> but it is **not** uploaded to GitHub Releases.
 
 ---
 
-## 3️⃣ Tag the release in git *(Option B only)*
+## 3️⃣ Commit and push
 
-```bash
-git add package.json
-git commit -m "Release v1.0.1"
-git tag v1.0.1
-git push origin main --tags
+Commit the version bump and code/doc changes before creating the release.
+
+```powershell
+git status
+git add .
+git commit -m "Release v1.0.8"
+git push
 ```
 
-> The git tag (`v1.0.1`) must match the release tag on GitHub. electron-updater matches
-> by the version string.
+> The GitHub Release tag (`v1.0.8`) should match the app version (`1.0.8`).
 
 ---
 
-## 4️⃣ Create the GitHub Release *(Option B only)*
+## 4️⃣ Create the GitHub Release
+
+### Using GitHub CLI *(recommended)*
+
+```powershell
+gh release create v1.0.8 `
+  "dist\Stremio-Discord-Presence-Setup-1.0.8.exe" `
+  "dist\Stremio-Discord-Presence-Setup-1.0.8.exe.blockmap" `
+  "dist\latest.yml" `
+  --repo MacroMaster101/Stremio_Discord_Rich_Presence `
+  --target main `
+  --title "v1.0.8" `
+  --notes "Describe what changed in this release."
+```
+
+If `gh` is installed but not in PATH, use the full path:
+
+```powershell
+& "C:\Program Files\GitHub CLI\gh.exe" release create v1.0.8 `
+  "dist\Stremio-Discord-Presence-Setup-1.0.8.exe" `
+  "dist\Stremio-Discord-Presence-Setup-1.0.8.exe.blockmap" `
+  "dist\latest.yml" `
+  --repo MacroMaster101/Stremio_Discord_Rich_Presence `
+  --target main `
+  --title "v1.0.8" `
+  --notes "Describe what changed in this release."
+```
+
+If the release already exists and you only need to replace assets:
+
+```powershell
+gh release upload v1.0.8 `
+  "dist\Stremio-Discord-Presence-Setup-1.0.8.exe" `
+  "dist\Stremio-Discord-Presence-Setup-1.0.8.exe.blockmap" `
+  "dist\latest.yml" `
+  --repo MacroMaster101/Stremio_Discord_Rich_Presence `
+  --clobber
+```
 
 ### Using the web UI
 
 1. Go to **[Releases](https://github.com/MacroMaster101/Stremio_Discord_Rich_Presence/releases) → Draft a new release**.
-2. **Choose a tag:** `v1.0.1` (the one you just pushed).
-3. **Release title:** `v1.0.1`.
-4. Write release notes (what changed).
-5. **Drag in all three files** from `dist/`:
-   - `Stremio Discord Presence Setup 1.0.1.exe`
-   - `Stremio Discord Presence Setup 1.0.1.exe.blockmap`
+2. **Choose a tag:** `v1.0.8`.
+3. **Release title:** `v1.0.8`.
+4. Write release notes.
+5. Drag in all three files from `dist/`:
+   - `Stremio-Discord-Presence-Setup-1.0.8.exe`
+   - `Stremio-Discord-Presence-Setup-1.0.8.exe.blockmap`
    - `latest.yml`
 6. Click **Publish release**.
-
-### Or using the GitHub CLI ([`gh`](https://cli.github.com/))
-
-```bash
-gh release create v1.0.1 \
-  "dist/Stremio Discord Presence Setup 1.0.1.exe" \
-  "dist/Stremio Discord Presence Setup 1.0.1.exe.blockmap" \
-  "dist/latest.yml" \
-  --title "v1.0.1" \
-  --notes "Describe what changed in this release."
-```
 
 ---
 
 ## 5️⃣ Verify auto-update works
 
-1. Install an **older** version of the app (e.g. the existing `1.0.0` build at `D:\My Projects`).
-2. Make sure your **new** release (`v1.0.1`) is published on GitHub.
+1. Install an **older packaged** version of the app.
+2. Make sure the new release is published on GitHub and includes all three assets.
 3. Launch the old app → open the tray menu → **Check for Updates**.
-4. It should detect `1.0.1`, download it in the background, and install on next quit.
+4. The tray should move through **Checking** → **Downloading** → **Restarting to update**.
+5. The app should restart automatically and open on the new version.
 
-> Auto-update only runs in the **packaged** app — it's a no-op when running via `npm start`
-> in development (see the note in [`src/updater.js`](src/updater.js)).
+> Auto-update only runs in the **packaged** app. It is a no-op when running via `npm start`
+> in development (see [`src/updater.js`](src/updater.js)).
 
 ---
 
 ## 🧾 Quick checklist
 
-- [ ] Bumped `version` in `package.json`
-- [ ] Built with `npm run dist` (or published via `--publish always`)
+- [ ] Bumped `version` in `package.json` and `package-lock.json`
+- [ ] Ran `npm run dist`
+- [ ] Confirmed `dist/latest.yml` points to the new `.exe`
 - [ ] Release includes **`.exe` + `.blockmap` + `latest.yml`**
-- [ ] Git tag matches the release tag (`v1.0.1`)
-- [ ] Release published (not left as a draft)
-- [ ] Verified **Check for Updates** finds the new version
+- [ ] GitHub Release tag matches the app version (`v1.0.8` ↔ `1.0.8`)
+- [ ] Release is published, not left as a draft
+- [ ] Verified **Check for Updates** downloads and restarts into the new version
 
 ---
 
@@ -161,6 +172,8 @@ gh release create v1.0.1 \
 | Problem | Fix |
 | ------- | --- |
 | Build fails with a symlink / privilege error | Enable **Developer Mode** or run the terminal **as Administrator**. |
-| Auto-update never finds the new version | Confirm `latest.yml` was uploaded and the `version` in it matches the release tag. |
-| `--publish always` fails to upload | Check `GH_TOKEN` is set and has `repo` scope; confirm `publish.owner`/`publish.repo` in `package.json` point to `MacroMaster101/Stremio_Discord_Rich_Presence`. |
-| Users on old versions don't get prompted | They must open the tray menu and pick **Check for Updates**, or relaunch — the check runs on launch. |
+| `gh` is installed but not recognized | Restart VS Code/PowerShell, or use `& "C:\Program Files\GitHub CLI\gh.exe"`. |
+| Auto-update never finds the new version | Confirm the release is published, the tag is newer, and `latest.yml` was uploaded. |
+| Update downloads but does not install | Confirm the `.exe` filename in `latest.yml` exactly matches the uploaded asset. |
+| Tray stays on checking | Wait for the timeout, then retry. Also check GitHub/network access and that all three assets exist. |
+| Users are still on an old version | They must launch the packaged app and pick **Check for Updates**, or relaunch so the startup check runs. |
