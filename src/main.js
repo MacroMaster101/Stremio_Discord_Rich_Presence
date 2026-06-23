@@ -165,7 +165,13 @@ function init() {
   // 2b. Initialize the auto-updater and check on launch.
   updater.init({
     onChecking: ({ manual }) => {
-      trayManager.setUpdateStatus({ state: 'checking', showMenu: manual });
+      // Only surface a visible "Checking…" state for user-initiated checks.
+      // The silent startup check must not leave the menu stuck on "Checking…"
+      // when no update exists (update-not-available is suppressed for silent
+      // checks, so nothing would reset it).
+      if (manual) {
+        trayManager.setUpdateStatus({ state: 'checking', showMenu: true });
+      }
     },
     onUpdateAvailable: (info) => {
       trayManager.setUpdateStatus({ state: 'downloading', version: info.version, percent: 0 });
@@ -178,13 +184,15 @@ function init() {
       trayManager.setUpdateStatus({ state: 'downloading', percent: progress.percent });
     },
     onUpdateDownloaded: (info) => {
-      trayManager.setUpdateStatus({ state: 'installing', version: info.version });
+      // Expose a clickable "Restart to update" item rather than yanking the app
+      // out from under the user. If quitAndInstall silently fails (installer
+      // can't elevate, file lock, etc.) the user still has a working menu.
+      trayManager.setUpdateStatus({ state: 'ready', version: info.version });
       trayManager.showNotification(
-        'Update downloaded',
-        `Version ${info.version} is ready. Restarting to update now.`,
+        'Update ready',
+        `Version ${info.version} downloaded. Click to restart and update.`,
         () => restartToUpdate()
       );
-      setTimeout(() => restartToUpdate(), 2500);
     },
     onNoUpdate: () => {
       trayManager.setUpdateStatus({ state: 'idle' });
@@ -251,8 +259,21 @@ function restartToUpdate() {
     pollingInterval = null;
   }
   discordRpc.disconnect();
-  // quitAndInstall handles quitting the app and launching the installer.
-  updater.quitAndInstall();
+  trayManager.setUpdateStatus({ state: 'installing' });
+
+  // quitAndInstall handles quitting the app and launching the installer. If it
+  // throws (or returns without quitting), fall back to a clean ready state so
+  // the user can retry instead of being stuck on "Restarting…".
+  try {
+    updater.quitAndInstall();
+  } catch (e) {
+    console.error(`Restart to update failed: ${e.message}`);
+    trayManager.setUpdateStatus({ state: 'ready' });
+    trayManager.showNotification(
+      'Update could not start',
+      'Restarting to update failed. Please quit and reinstall manually.'
+    );
+  }
 }
 
 // Electron application lifecycle hooks

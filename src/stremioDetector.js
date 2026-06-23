@@ -55,45 +55,76 @@ function cleanTitle(title) {
   // Replace dots, hyphens, and underscores with spaces
   cleaned = cleaned.replace(/[\._]/g, ' ');
   
-  // Remove common torrent/video quality and release tags (case-insensitive)
+  // Remove common torrent/video quality and release tags (case-insensitive).
+  // NOTE: order matters — multi-word tags like "web dl" must be stripped before
+  // the standalone "web" so we never leave a dangling "web" behind.
   const tags = [
     /\b\d{3,4}p\b/gi,         // 1080p, 720p, etc.
-    /\bx26[45]\b/gi,          // x264, x265
-    /\bh\.?26[45]\b/gi,       // h264, h265
-    /\bhevc\b/gi,
-    /\bweb-?dl\b/gi,
-    /\bwebrip\b/gi,
-    /\bbluray\b/gi,
-    /\bhdr\b/gi,
-    /\bmulti\b/gi,
-    /\bdts\b/gi,
-    /\beac3\b/gi,
-    /\b5\.1\b/g,
-    /\b10bit\b/gi,
-    /\bImE\b/g,
-    /\bHiggsBoson\b/g,
-    /\bMeGusta\b/gi,
-    /\bAMZN\b/gi,
-    /\bwww\b/gi,
-    /\bUIndex\b/gi,
-    /\borg\b/gi,
-    /\bYIFY\b/gi,
-    /\bYTS\b/gi,
-    /\bRARBG\b/gi,
-    /\bREMASTERED\b/gi,
-    /\bPROPER\b/gi,
-    /\bREPACK\b/gi,
-    /\bEXTENDED\b/gi,
-    /\bUNRATED\b/gi,
-    /\bDDP?5\b/gi,
-    /\bAAC\b/gi,
-    /\bDV\b/gi,
     /\b2160p\b/gi,
+    /\bx26[45]\b/gi,          // x264, x265
+    /\bh[\s.]?26[45]\b/gi,    // h264, h265, h 265 (after dot-normalization)
+    /\bhevc\b/gi,
+    /\bavc\b/gi,
+    /\bweb[\s-]?dl\b/gi,      // web-dl, web dl, webdl
+    /\bweb[\s-]?rip\b/gi,     // web-rip, webrip
+    /\bweb\b/gi,              // bare "web" source tag (e.g. ...web HiggsBoson)
+    /\bhdtv\b/gi,
+    /\bbluray\b/gi,
+    /\bblu[\s-]?ray\b/gi,
+    /\bbrrip\b/gi,
+    /\bbdrip\b/gi,
+    /\bdvdrip\b/gi,
+    /\bhdr10?\b/gi,
+    /\bhdr\b/gi,
+    /\bsdr\b/gi,
+    /\bdolby\b/gi,
+    /\batmos\b/gi,
+    /\bmulti\b/gi,
+    /\bdual\b/gi,
+    /\bdual[\s-]?audio\b/gi,
+    /\bsubbed\b/gi,
+    /\bdubbed\b/gi,
+    /\besub\b/gi,
+    /\bdts\b/gi,
+    /\bddp?5[\s.]?1\b/gi,     // DDP5.1 / DDP5 1 / DD5.1 (channel layout glued on)
+    /\bddp?7[\s.]?1\b/gi,
+    /\bddp?5\b/gi,
+    /\bddp\b/gi,
+    /\bdd\b/gi,
+    /\beac3\b/gi,
+    /\bac3\b/gi,
+    /\baac\b/gi,
+    /\b\d\.[01]\b/g,          // audio channel layouts: 5.1, 7.1, 2.0 (any X.Y)
+    /\b10bit\b/gi,
+    /\b8bit\b/gi,
+    /\bdv\b/gi,
+    /\bamzn\b/gi,
+    /\bnf\b/gi,                // Netflix source tag
+    /\bdsnp\b/gi,             // Disney+ source tag
+    /\bhmax\b/gi,             // HBO Max source tag
+    /\bhulu\b/gi,             // Hulu source tag
+    /\batvp\b/gi,             // Apple TV+ source tag
+    /\bpcok\b/gi,             // Peacock source tag
+    /\bpmtp\b/gi,             // Paramount+ source tag
+    /\bime\b/gi,
+    /\bhiggsboson\b/gi,
+    /\bmegusta\b/gi,
+    /\bwww\b/gi,
+    /\buindex\b/gi,
+    /\borg\b/gi,
+    /\byify\b/gi,
+    /\byts\b/gi,
+    /\brarbg\b/gi,
+    /\bremastered\b/gi,
+    /\bproper\b/gi,
+    /\brepack\b/gi,
+    /\bextended\b/gi,
+    /\bunrated\b/gi,
     /\bt3nzin\b/gi,
-    /\bGalaxyTV\b/gi,
-    /\bTGx\b/gi
+    /\bgalaxytv\b/gi,
+    /\btgx\b/gi
   ];
-  
+
   tags.forEach(tag => {
     cleaned = cleaned.replace(tag, '');
   });
@@ -101,13 +132,34 @@ function cleanTitle(title) {
   // Remove empty parentheses/brackets that might result from tag removals
   cleaned = cleaned.replace(/\(\s*\)/g, '');
   cleaned = cleaned.replace(/\[\s*\]/g, '');
-  
+
+  // Strip a trailing release-group token such as "-RARBG", "-NTb", "-ETTV",
+  // "-FLUX" left after quality/codec tags were removed. Only strip when it
+  // clearly looks like a scene group (ALL-CAPS, or a short mixed-case token
+  // with at least one capital) so legitimate hyphenated titles like
+  // "Spider-Man" are preserved.
+  cleaned = cleaned.replace(/\s+-\s*([A-Za-z0-9]{2,})\s*$/, (m, grp) => {
+    const isAllCaps = grp === grp.toUpperCase() && /[A-Z]/.test(grp);
+    const isShortMixed = grp.length <= 6 && /[A-Z]/.test(grp) && /[a-z]/.test(grp);
+    return (isAllCaps || isShortMixed) ? ' ' : m;
+  });
+
+  // Drop dangling stray separators and orphan single characters left behind
+  // (e.g. a lone "(" from a "(1x3)" marker, or a leftover hyphen).
+  cleaned = cleaned.replace(/[([{<]+\s*$/g, '');
+  cleaned = cleaned.replace(/^\s*[)\]}>]+/g, '');
+
+  // A trailing lone digit is almost always an audio-channel leftover (e.g.
+  // "DDP5 1" -> "1"); titles don't end in a bare single digit.
+  cleaned = cleaned.replace(/\s+\d\s*$/g, '');
+
   // Clean up multiple spaces and clean trim
   cleaned = cleaned.replace(/\s+/g, ' ');
   cleaned = cleaned.trim();
-  
+
   // If the title starts or ends with a dash, clean it up
-  cleaned = cleaned.replace(/^-\s*|\s*-\s*$/g, '');
+  cleaned = cleaned.replace(/^[-–·]\s*|\s*[-–·]\s*$/g, '');
+  cleaned = cleaned.trim();
 
   return cleaned || null;
 }
@@ -126,6 +178,33 @@ function stripYear(s) {
   out = out.replace(/\s+/g, ' ').trim();
   out = out.replace(/^[-–·\s]+|[-–·\s]+$/g, '').trim();
   return out || null;
+}
+
+/**
+ * Validate a candidate episode title extracted from a filename. Release files
+ * often leave junk after the SxxExx marker (group names, language codes, stray
+ * source tags like "web HiggsBoson"), which must NOT be shown as an episode
+ * title. Returns the title only if it looks like a real, human-readable name.
+ * @param {string|null} s
+ * @returns {string|null}
+ */
+function sanitizeEpisodeTitle(s) {
+  if (!s) return null;
+  let t = s.trim();
+  if (t.length < 2) return null;
+
+  // Must contain at least one letter (reject pure numbers/symbols).
+  if (!/[a-zA-Z]/.test(t)) return null;
+
+  // Reject if it's a single lowercase "word" with no spaces — that's almost
+  // always a leftover release-group/source tag (e.g. "higgsboson", "ettv"),
+  // never a real episode title (real titles are Title-Cased words).
+  if (!/\s/.test(t) && t === t.toLowerCase()) return null;
+
+  // Reject ALL-CAPS single tokens (group tags like "RARBG", "ETTV").
+  if (!/\s/.test(t) && t === t.toUpperCase() && t.length <= 8) return null;
+
+  return t;
 }
 
 /**
@@ -174,9 +253,7 @@ function parseMediaInfo(rawName) {
     let afterPart = beforeIdx >= 0 ? base.slice(beforeIdx + seMatch[0].length) : '';
 
     const name = stripYear(cleanTitle(showPart)) || cleanTitle(base) || 'Unknown';
-    let episodeTitle = stripYear(cleanTitle(afterPart));
-    // Drop episode title if it's empty or just leftover tags.
-    if (episodeTitle && episodeTitle.length < 2) episodeTitle = null;
+    let episodeTitle = sanitizeEpisodeTitle(stripYear(cleanTitle(afterPart)));
 
     const sStr = String(season).padStart(2, '0');
     const eStr = String(episode).padStart(2, '0');
@@ -213,6 +290,41 @@ function parseMediaInfo(rawName) {
 }
 
 /**
+ * Rough measure of how actively a torrent file is being cached/read, used to
+ * disambiguate multiple cached files within a season-pack torrent.
+ * @param {object} file
+ * @returns {number}
+ */
+function cacheActivityScore(file) {
+  if (!file) return 0;
+  const ev = file.__cacheEvents;
+  if (Array.isArray(ev)) return ev.length;
+  if (ev && typeof ev === 'object') return Object.keys(ev).length;
+  if (typeof file.length === 'number') return file.length; // tiebreak by size
+  return ev ? 1 : 0;
+}
+
+const VIDEO_EXT_RE = /\.(mkv|mp4|avi|mov|m4v|webm|ts|flv|wmv|mpg|mpeg)$/i;
+
+/**
+ * Choose the largest video file from a torrent's file list. For single-file
+ * torrents this returns that file; for season packs it errs toward the biggest
+ * episode, which is a safer default than files[0] when no active file is known.
+ * @param {Array} files
+ * @returns {object|null}
+ */
+function pickLargestVideoFile(files) {
+  if (!Array.isArray(files) || files.length === 0) return null;
+  const videos = files.filter(f => f && f.name && VIDEO_EXT_RE.test(f.name));
+  const pool = videos.length ? videos : files;
+  return pool.reduce((best, f) => {
+    const size = (f && typeof f.length === 'number') ? f.length : 0;
+    const bestSize = (best && typeof best.length === 'number') ? best.length : 0;
+    return size > bestSize ? f : best;
+  }, pool[0]);
+}
+
+/**
  * Queries the Stremio local streaming server (port 11470) for the currently
  * active media and returns structured info (see parseMediaInfo), or null.
  * @returns {Promise<object|null>}
@@ -241,11 +353,17 @@ function fetchActiveMedia() {
             return resolve(null);
           }
 
-          // Sort torrents to identify the currently active stream:
-          // 1. Prioritize active download queue (queued pieces > 0)
-          // 2. Prioritize count of unique peers encountered (unique)
-          // 3. Prioritize active connection count (swarmConnections)
-          // 4. Fallback to the latest tracker start time
+          // Sort torrents to identify the currently active stream. The single
+          // most reliable signal that a torrent is the one being PLAYED (not
+          // just an old one lingering in cache) is active streaming progress:
+          // Stremio reports `streamProgress` / `streamLen` only for the file the
+          // player is actually reading. We rank on that first, then fall back to
+          // download/peer activity for torrents that haven't started streaming.
+          // 1. Active streaming (streamProgress set / streamLen > 0)
+          // 2. Active download queue (queued pieces > 0)
+          // 3. Count of unique peers encountered (unique)
+          // 4. Active connection count (swarmConnections)
+          // 5. Latest tracker start time
           const torrentsWithMetrics = keys.map(key => {
             const torrent = stats[key];
             let latestStart = 0;
@@ -259,9 +377,18 @@ function fetchActiveMedia() {
                 }
               });
             }
+            // `streaming` is truthy when this torrent is the one being read by
+            // the player right now. streamLen/streamProgress are only present on
+            // the active stream.
+            const isStreaming =
+              !!torrent.streaming ||
+              (typeof torrent.streamLen === 'number' && torrent.streamLen > 0) ||
+              (typeof torrent.streamProgress === 'number' && torrent.streamProgress > 0);
+
             return {
               key,
               torrent,
+              isStreaming: isStreaming ? 1 : 0,
               queued: torrent.queued || 0,
               unique: torrent.unique || 0,
               swarmConnections: torrent.swarmConnections || 0,
@@ -271,6 +398,9 @@ function fetchActiveMedia() {
 
           // Sort descending using our priority layers
           torrentsWithMetrics.sort((a, b) => {
+            if (b.isStreaming !== a.isStreaming) {
+              return b.isStreaming - a.isStreaming;
+            }
             if (b.queued !== a.queued) {
               return b.queued - a.queued;
             }
@@ -288,10 +418,33 @@ function fetchActiveMedia() {
             return resolve(null);
           }
 
-          // Prioritize the file currently being cached/streamed
+          // Within the chosen torrent (which may be a season pack with multiple
+          // episode files), pick the file actually being streamed. Stremio marks
+          // it via `__cacheEvents`/active selections; we prefer, in order:
+          //   1. the file with the largest active cache window (currently read)
+          //   2. any file flagged with __cacheEvents
+          //   3. the largest video file (best guess for a single-file torrent)
           let activeFile = null;
-          if (activeTorrent.files) {
-            activeFile = activeTorrent.files.find(f => f.__cacheEvents);
+          if (Array.isArray(activeTorrent.files) && activeTorrent.files.length) {
+            const files = activeTorrent.files;
+
+            // Files Stremio is actively caching/reading carry __cacheEvents.
+            const cached = files.filter(f => f && f.__cacheEvents);
+            if (cached.length === 1) {
+              activeFile = cached[0];
+            } else if (cached.length > 1) {
+              // Multiple cached files: choose the one with the most cache
+              // activity (the one the player is reading right now).
+              activeFile = cached.reduce((best, f) => {
+                const score = cacheActivityScore(f);
+                return score > cacheActivityScore(best) ? f : best;
+              }, cached[0]);
+            } else {
+              // Nothing flagged yet (just opened): fall back to the largest
+              // video file rather than blindly taking files[0], which is often
+              // the first episode of a season pack.
+              activeFile = pickLargestVideoFile(files);
+            }
           }
 
           const rawTitle = activeFile ? activeFile.name : activeTorrent.name;
