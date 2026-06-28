@@ -249,25 +249,56 @@ function shutdown() {
   app.quit();
 }
 
+// Guard so a double-click on "Restart to update" can't launch two installers.
+let installLaunched = false;
+
 /**
- * Cleanly tear down, then quit and install the downloaded update immediately.
+ * Cleanly tear down, then quit and install the downloaded update.
  * Used by the "Restart to update" tray item and the update notification click.
+ *
+ * The actual install + relaunch is performed by electron-updater's
+ * quitAndInstall (non-silent), which launches the installer and then quits the
+ * app on a later tick. We must NOT call app.quit() ourselves or release/hold
+ * anything that would race that — we just tear down our own subsystems and
+ * hand off. The single-instance lock is released in will-quit (see below) so
+ * the installer isn't blocked by the still-running instance.
  */
 function restartToUpdate() {
+  if (installLaunched) return;
+
+  trayManager.setUpdateStatus({ state: 'installing' });
+
   if (pollingInterval) {
     clearInterval(pollingInterval);
     pollingInterval = null;
   }
   discordRpc.disconnect();
-  trayManager.setUpdateStatus({ state: 'installing' });
 
-  // quitAndInstall handles quitting the app and launching the installer. If it
-  // throws (or returns without quitting), fall back to a clean ready state so
-  // the user can retry instead of being stuck on "Restarting…".
+  let launched = false;
   try {
-    updater.quitAndInstall();
+    launched = updater.quitAndInstall();
   } catch (e) {
     console.error(`Restart to update failed: ${e.message}`);
+    launched = false;
+  }
+
+  if (launched) {
+    installLaunched = true;
+    // Safety net: if for any reason the installer didn't take over and quit the
+    // app within a few seconds, restore a usable "ready" state so the user can
+    // retry rather than being stuck on "Installing…".
+    setTimeout(() => {
+      if (installLaunched) {
+        console.warn('Updater: install did not complete; restoring ready state.');
+        installLaunched = false;
+        trayManager.setUpdateStatus({ state: 'ready' });
+        trayManager.showNotification(
+          'Update could not start',
+          'The installer did not launch. Please download the latest version manually.'
+        );
+      }
+    }, 10000);
+  } else {
     trayManager.setUpdateStatus({ state: 'ready' });
     trayManager.showNotification(
       'Update could not start',
@@ -290,4 +321,7 @@ app.on('will-quit', () => {
     clearInterval(pollingInterval);
   }
   discordRpc.disconnect();
+  // Release the single-instance lock so the installer's freshly relaunched
+  // copy can acquire it without colliding with this dying instance.
+  app.releaseSingleInstanceLock();
 });

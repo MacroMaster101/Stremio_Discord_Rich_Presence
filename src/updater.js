@@ -73,10 +73,14 @@ function init(callbacks = {}) {
   if (initialized || !autoUpdater) return;
   initialized = true;
 
-  // Download automatically, but only install when the user chooses restart or
-  // when the app quits. quitAndInstall() below uses silent install + relaunch.
+  // Download automatically. Install only when the user explicitly chooses
+  // "Restart to update" (see quitAndInstall). We disable autoInstallOnAppQuit
+  // so a normal Quit just quits — updates are an explicit, visible action, not
+  // a surprise install when the user closes the app.
   autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoInstallOnAppQuit = false;
+  // Relaunch the app after the (one-click, silent) installer finishes.
+  autoUpdater.autoRunAppAfterInstall = true;
 
   autoUpdater.on('update-available', (info) => {
     console.log(`Updater: update available -> ${info.version}`);
@@ -140,10 +144,19 @@ function checkForUpdates(isManual = false) {
 }
 
 /**
- * Silently install a downloaded update and relaunch the app.
+ * Install the downloaded update and relaunch the app.
+ *
+ * Uses a silent install (isSilent=true), which is the correct, reliable path
+ * for our one-click NSIS installer (oneClick:true). The installer closes the
+ * running app, installs in place, and relaunches it (isForceRunAfter=true).
+ *
+ * @returns {boolean} true if the install was launched, false otherwise.
  */
 function quitAndInstall() {
-  if (autoUpdater) autoUpdater.quitAndInstall(true, true);
+  if (!autoUpdater) return false;
+  // (isSilent=true, isForceRunAfter=true)
+  autoUpdater.quitAndInstall(true, true);
+  return true;
 }
 
 module.exports = {

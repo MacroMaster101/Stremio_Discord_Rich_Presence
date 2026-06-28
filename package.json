@@ -1,6 +1,6 @@
 {
   "name": "stremio-discord-presence",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "A Windows system tray companion app that displays your Stremio status on Discord Rich Presence.",
   "main": "src/main.js",
   "scripts": {
@@ -57,10 +57,9 @@
       "icon": "assets/app-icon.ico"
     },
     "nsis": {
-      "oneClick": false,
+      "oneClick": true,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": false,
+      "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Stremio Discord Presence",
       "include": "build/installer.nsh",
