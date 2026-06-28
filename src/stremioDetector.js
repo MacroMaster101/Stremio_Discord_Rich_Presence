@@ -51,7 +51,13 @@ function cleanTitle(title) {
   
   // Remove file extension
   let cleaned = title.replace(/\.[a-zA-Z0-9]{2,4}$/, '');
-  
+
+  // Remove bracketed segments: fansub group tags ("[SubsPlease]"), CRC32
+  // hashes ("[A7A55BC2]"), and tracker stamps ("[EZTVx.to]", "(YTS.MX)").
+  // These are never part of the real title. Done before separator
+  // normalization so a dot inside a bracket (EZTVx.to) is removed with it.
+  cleaned = cleaned.replace(/[\[(][^\][()]*[\])]/g, ' ');
+
   // Replace dots, hyphens, and underscores with spaces
   cleaned = cleaned.replace(/[\._]/g, ' ');
   
@@ -115,6 +121,20 @@ function cleanTitle(title) {
     /\byify\b/gi,
     /\byts\b/gi,
     /\brarbg\b/gi,
+    /\beztvx?\b/gi,           // EZTV / EZTVx tracker tag
+    /\bethel\b/gi,            // common EZTV release-group tag
+    /\bntb\b/gi,
+    /\bflux\b/gi,
+    /\bsuccessfulcrab\b/gi,
+    /\bggwp\b/gi,
+    /\bggez\b/gi,
+    /\bedith\b/gi,
+    /\bnhtfs\b/gi,
+    /\bcakes\b/gi,
+    /\bsubsplease\b/gi,       // anime fansub groups (in case brackets stripped)
+    /\bhorriblesubs\b/gi,
+    /\berai[\s-]?raws\b/gi,
+    /\basw\b/gi,
     /\bremastered\b/gi,
     /\bproper\b/gi,
     /\brepack\b/gi,
@@ -272,6 +292,45 @@ function parseMediaInfo(rawName) {
       searchName: name,
       display
     };
+  }
+
+  // Anime: "[Group] Show Name - 60 [HASH]" — absolute episode number, no
+  // SxxExx. Detect the " - NN" episode marker that fansub releases use. We
+  // work from a copy with bracketed group/hash tags removed so the marker is
+  // the last meaningful token. Guard against false positives: skip when a year
+  // was found (movies like "Blade Runner 2049"), and require either a real
+  // " - NN" separator OR a leading "[Group]" tag. This keeps bare movie names
+  // that merely end in a number (e.g. "District 9", "Apollo 13") as movies.
+  const hasGroupTag = /^\s*[\[(][^\][()]*[\])]/.test(base);
+  if (!year) {
+    const noBrackets = base.replace(/[\[(][^\][()]*[\])]/g, ' ').replace(/\s+/g, ' ').trim();
+    // Require " - NN" (dashed) unless a group tag signalled an anime release,
+    // in which case a plain trailing " NN" is also accepted. Allow up to 4
+    // digits for long-running shows (One Piece is past ep 1000).
+    const animeMatch = hasGroupTag
+      ? noBrackets.match(/^(.*?)\s+-?\s*(\d{1,4})\s*$/)
+      : noBrackets.match(/^(.*?)\s+-\s*(\d{1,4})\s*$/);
+    if (animeMatch && animeMatch[1].trim()) {
+      const showPart = animeMatch[1];
+      const episode = parseInt(animeMatch[2], 10);
+      const animeName = stripYear(cleanTitle(showPart));
+      // Only treat as anime if a real name survives cleaning (avoids turning a
+      // bare numeric/junk filename into a phantom "episode").
+      if (animeName && /[a-zA-Z]/.test(animeName)) {
+        const epLabel = `E${String(episode).padStart(2, '0')}`;
+        return {
+          type: 'series',
+          name: animeName,
+          year: null,
+          season: null,
+          episode,
+          episodeTitle: null,
+          absoluteEpisode: true,   // no season — show "E60", not "S01E60"
+          searchName: animeName,
+          display: `${animeName} · ${epLabel}`
+        };
+      }
+    }
   }
 
   // Movie: cleaned name with the year stripped out (we re-add it formatted).

@@ -153,7 +153,11 @@ function updatePresence(isStremioRunning, privacyMode, media, posterUrl) {
 
     if (media && media.type === 'series') {
       // Line 1: show name. Line 2: episode (+ episode title).
-      const ep = `S${String(media.season).padStart(2, '0')}E${String(media.episode).padStart(2, '0')}`;
+      // Anime with an absolute episode number has no season — show "E60"
+      // rather than a misleading "S01E60".
+      const ep = media.absoluteEpisode
+        ? `E${String(media.episode).padStart(2, '0')}`
+        : `S${String(media.season).padStart(2, '0')}E${String(media.episode).padStart(2, '0')}`;
       activity.details = media.name;
       activity.state = media.episodeTitle ? `${ep} · ${media.episodeTitle}` : ep;
     } else if (media) {
