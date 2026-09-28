@@ -62,6 +62,12 @@ function openAboutWindow() {
   });
 
   aboutWindow.setMenuBarVisibility(false);
+
+  // The About page is a single local file: block new windows and navigation
+  // away from it. External links go through the allow-listed IPC below.
+  aboutWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  aboutWindow.webContents.on('will-navigate', (event) => event.preventDefault());
+
   aboutWindow.loadFile(path.join(__dirname, 'about.html'));
 
   aboutWindow.on('closed', () => {
@@ -105,8 +111,8 @@ function registerIpc(getStatus) {
 
   // Open only known, allow-listed external links in the system browser.
   ipcMain.on('about:open-link', (event, key) => {
-    const url = ALLOWED_LINKS[key];
-    if (url) shell.openExternal(url);
+    if (typeof key !== 'string' || !Object.hasOwn(ALLOWED_LINKS, key)) return;
+    shell.openExternal(ALLOWED_LINKS[key]);
   });
 }
 

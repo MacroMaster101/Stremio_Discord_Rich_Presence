@@ -1,7 +1,7 @@
 # 📦 Releasing a New Version
 
-This guide explains how to build the Windows installer `.exe` and publish it as a
-GitHub Release so users can download it **and** receive automatic in-app updates.
+This guide explains how to publish a new version as a GitHub Release so users can
+download it **and** receive automatic in-app updates.
 
 > The app uses [`electron-updater`](https://www.electron.build/auto-update) wired to
 > **GitHub Releases** (see [`src/updater.js`](src/updater.js) and the `publish` block in
@@ -9,7 +9,10 @@ GitHub Release so users can download it **and** receive automatic in-app updates
 > the `.exe` **plus** the auto-generated `latest.yml` and `.blockmap` files.
 
 > ✨ Release files are intentionally hyphenated, like
-> `Stremio-Discord-Presence-Setup-1.0.8.exe`, so GitHub assets and `latest.yml` match.
+> `Stremio-Discord-Presence-Setup-1.0.13.exe`, so GitHub assets and `latest.yml` match.
+
+Releases are **built and published by GitHub Actions** ([`.github/workflows/release.yml`](.github/workflows/release.yml))
+when a version tag is pushed. You don't need to build or upload anything by hand.
 
 ---
 
@@ -17,132 +20,76 @@ GitHub Release so users can download it **and** receive automatic in-app updates
 
 - [Node.js](https://nodejs.org/) v18+ installed.
 - Dependencies installed: `npm install`.
-- GitHub CLI installed: `winget install --id GitHub.cli`.
-- Logged in to GitHub CLI: `gh auth login`.
-- A clean working tree before you start the release.
-- **Developer Mode ON** (Settings → Privacy & security → For developers) *or* run your
-  terminal **as Administrator** — the NSIS installer build can create symbolic links.
+- GitHub CLI installed and logged in (`winget install --id GitHub.cli`, then `gh auth login`).
 
-> 💡 If PowerShell says `gh` is not recognized after installing GitHub CLI, restart VS Code
-> or PowerShell. You can also run it directly with
-> `& "C:\Program Files\GitHub CLI\gh.exe"`.
+> 🔒 `main` is protected by a ruleset: changes land **only through pull requests** with
+> passing CI (**Dependency audit**, **Build (Windows)**, and CodeQL). Direct pushes and
+> force-pushes to `main` are blocked. Release tags (`v*`) can't be moved or deleted once pushed.
 
 ---
 
-## 1️⃣ Bump the version
+## 1️⃣ Bump the version in a pull request
 
 `electron-updater` decides whether an update is available by comparing the app version
 against the latest GitHub Release. **Bump it before every release.**
 
-For a patch release:
-
 ```powershell
+git checkout main
+git pull
+git checkout -b release-1.0.13
 npm version patch --no-git-tag-version
+git commit -am "Bump version to 1.0.13"
+git push -u origin release-1.0.13
+gh pr create --fill
 ```
 
-Or set an exact version:
-
-```powershell
-npm version 1.0.8 --no-git-tag-version
-```
-
-This updates both [`package.json`](package.json) and [`package-lock.json`](package-lock.json).
 Use [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
-(e.g. `1.0.7` → `1.0.8` for a bug fix, `1.1.0` for a feature).
+(e.g. `1.0.12` → `1.0.13` for a bug fix, `1.1.0` for a feature).
+
+Wait for CI to pass, then **merge the PR**. CI also uploads the built installer as a
+workflow artifact, if you want to test it before releasing.
 
 ---
 
-## 2️⃣ Build the installer
+## 2️⃣ Tag the release on `main`
 
 ```powershell
-npm run dist
+git checkout main
+git pull
+git tag v1.0.13
+git push origin v1.0.13
 ```
 
-This produces the release assets in `dist/`:
-
-| File | Purpose |
-| ---- | ------- |
-| `Stremio-Discord-Presence-Setup-1.0.8.exe` | The installer users download |
-| `Stremio-Discord-Presence-Setup-1.0.8.exe.blockmap` | Enables fast differential updates |
-| `latest.yml` | **Required** — tells the app what's newest |
-
-> ⚠️ Upload all three files. If `latest.yml` is missing or points to a different filename,
-> auto-update breaks.
-
-> 🧹 `electron-builder` may also create `dist/win-unpacked/`. That's useful for local testing,
-> but it is **not** uploaded to GitHub Releases.
+The tag (`v1.0.13`) **must** match the `version` in `package.json` (`1.0.13`) and point to a
+commit on `main`. The workflow refuses to publish otherwise.
 
 ---
 
-## 3️⃣ Commit and push
+## 3️⃣ Let the Release workflow publish it
 
-Commit the version bump and code/doc changes before creating the release.
+Pushing the tag starts the **Release** workflow, which:
+
+1. Verifies the tag matches `package.json` and is on `main`.
+2. Runs `npm ci` and `npm audit` (fails on high/critical advisories in shipped dependencies).
+3. Builds the NSIS installer with `npm run dist -- --publish never`.
+4. Records a [build provenance attestation](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations) for the `.exe`.
+5. Creates the GitHub Release with the `.exe`, `.blockmap` and `latest.yml`, and auto-generated notes.
+
+Watch it under **Actions → Release**, or:
 
 ```powershell
-git status
-git add .
-git commit -m "Release v1.0.8"
-git push
+gh run watch
 ```
 
-> The GitHub Release tag (`v1.0.8`) should match the app version (`1.0.8`).
+Anyone can verify a downloaded installer was built by this workflow:
+
+```powershell
+gh attestation verify Stremio-Discord-Presence-Setup-1.0.13.exe --repo MacroMaster101/Stremio_Discord_Rich_Presence
+```
 
 ---
 
-## 4️⃣ Create the GitHub Release
-
-### Using GitHub CLI *(recommended)*
-
-```powershell
-gh release create v1.0.8 `
-  "dist\Stremio-Discord-Presence-Setup-1.0.8.exe" `
-  "dist\Stremio-Discord-Presence-Setup-1.0.8.exe.blockmap" `
-  "dist\latest.yml" `
-  --repo MacroMaster101/Stremio_Discord_Rich_Presence `
-  --target main `
-  --title "v1.0.8" `
-  --notes "Describe what changed in this release."
-```
-
-If `gh` is installed but not in PATH, use the full path:
-
-```powershell
-& "C:\Program Files\GitHub CLI\gh.exe" release create v1.0.8 `
-  "dist\Stremio-Discord-Presence-Setup-1.0.8.exe" `
-  "dist\Stremio-Discord-Presence-Setup-1.0.8.exe.blockmap" `
-  "dist\latest.yml" `
-  --repo MacroMaster101/Stremio_Discord_Rich_Presence `
-  --target main `
-  --title "v1.0.8" `
-  --notes "Describe what changed in this release."
-```
-
-If the release already exists and you only need to replace assets:
-
-```powershell
-gh release upload v1.0.8 `
-  "dist\Stremio-Discord-Presence-Setup-1.0.8.exe" `
-  "dist\Stremio-Discord-Presence-Setup-1.0.8.exe.blockmap" `
-  "dist\latest.yml" `
-  --repo MacroMaster101/Stremio_Discord_Rich_Presence `
-  --clobber
-```
-
-### Using the web UI
-
-1. Go to **[Releases](https://github.com/MacroMaster101/Stremio_Discord_Rich_Presence/releases) → Draft a new release**.
-2. **Choose a tag:** `v1.0.8`.
-3. **Release title:** `v1.0.8`.
-4. Write release notes.
-5. Drag in all three files from `dist/`:
-   - `Stremio-Discord-Presence-Setup-1.0.8.exe`
-   - `Stremio-Discord-Presence-Setup-1.0.8.exe.blockmap`
-   - `latest.yml`
-6. Click **Publish release**.
-
----
-
-## 5️⃣ Verify auto-update works
+## 4️⃣ Verify auto-update works
 
 1. Install an **older packaged** version of the app.
 2. Make sure the new release is published on GitHub and includes all three assets.
@@ -157,13 +104,34 @@ gh release upload v1.0.8 `
 
 ## 🧾 Quick checklist
 
-- [ ] Bumped `version` in `package.json` and `package-lock.json`
-- [ ] Ran `npm run dist`
-- [ ] Confirmed `dist/latest.yml` points to the new `.exe`
+- [ ] Version bumped in `package.json` and `package-lock.json` via a merged PR
+- [ ] CI green on `main`
+- [ ] Tag `vX.Y.Z` pushed from `main`, matching the app version
+- [ ] Release workflow succeeded
 - [ ] Release includes **`.exe` + `.blockmap` + `latest.yml`**
-- [ ] GitHub Release tag matches the app version (`v1.0.8` ↔ `1.0.8`)
-- [ ] Release is published, not left as a draft
 - [ ] Verified **Check for Updates** downloads and restarts into the new version
+
+---
+
+## 🛠️ Manual fallback
+
+Only if GitHub Actions is unavailable. Build locally and upload the three files yourself.
+
+> Building the NSIS installer locally needs **Developer Mode ON** (Settings → Privacy &
+> security → For developers) *or* a terminal run **as Administrator**, because it can create
+> symbolic links.
+
+```powershell
+npm run dist
+gh release create v1.0.13 `
+  "dist\Stremio-Discord-Presence-Setup-1.0.13.exe" `
+  "dist\Stremio-Discord-Presence-Setup-1.0.13.exe.blockmap" `
+  "dist\latest.yml" `
+  --repo MacroMaster101/Stremio_Discord_Rich_Presence `
+  --verify-tag `
+  --title "v1.0.13" `
+  --notes "Describe what changed in this release."
+```
 
 ---
 
@@ -171,9 +139,10 @@ gh release upload v1.0.8 `
 
 | Problem | Fix |
 | ------- | --- |
-| Build fails with a symlink / privilege error | Enable **Developer Mode** or run the terminal **as Administrator**. |
-| `gh` is installed but not recognized | Restart VS Code/PowerShell, or use `& "C:\Program Files\GitHub CLI\gh.exe"`. |
-| Auto-update never finds the new version | Confirm the release is published, the tag is newer, and `latest.yml` was uploaded. |
+| Release workflow fails at "Verify tag" | The tag doesn't match `package.json`, or it wasn't created on `main`. Bump via PR, merge, then tag the merged commit. |
+| Release workflow fails at `npm audit` | A shipped dependency has a high/critical advisory. Merge the Dependabot fix (or run `npm audit fix` in a PR), then tag again with a new version. |
+| Can't push to `main` | Expected — `main` is protected. Open a pull request instead. |
+| Auto-update never finds the new version | Confirm the release is published (not a draft), the tag is newer, and `latest.yml` was uploaded. |
 | Update downloads but does not install | Confirm the `.exe` filename in `latest.yml` exactly matches the uploaded asset. |
 | Tray stays on checking | Wait for the timeout, then retry. Also check GitHub/network access and that all three assets exist. |
 | Users are still on an old version | They must launch the packaged app and pick **Check for Updates**, or relaunch so the startup check runs. |

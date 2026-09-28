@@ -28,7 +28,12 @@ const HKCU_STARTUP_APPROVED_RUN_KEY =
  * @returns {string}
  */
 function quoteArg(value) {
-  const escaped = String(value).replace(/"/g, '\\"');
+  // Windows (CommandLineToArgvW) rules: backslashes are literal unless they
+  // precede a double quote. Double any backslash run that precedes an embedded
+  // quote (then escape the quote) or the closing quote we add.
+  const escaped = String(value)
+    .replace(/(\\*)"/g, '$1$1\\"')
+    .replace(/(\\+)$/, '$1$1');
   return '"' + escaped + '"';
 }
 
