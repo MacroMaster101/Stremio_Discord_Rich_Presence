@@ -37,7 +37,7 @@ function getEnvSearchPaths() {
 // Load the first .env file that actually exists
 for (const envPath of getEnvSearchPaths()) {
   if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath });
+    dotenv.config({ path: envPath, quiet: true });
     break;
   }
 }
