@@ -272,7 +272,7 @@ npm run dist
 
 > **Note:** Building the NSIS installer (`npm run dist`) may require **Developer Mode** enabled (Settings → Privacy & security → For developers) or an elevated terminal, because it creates symbolic links. The portable build (`npm run pack`) has no such requirement.
 
-Every pull request and push to `main` runs **[CI](.github/workflows/ci.yml)**: a dependency audit plus a full Windows installer build (downloadable from the workflow run's artifacts).
+Every pull request and every push to `dev` or `main` runs **[CI](.github/workflows/ci.yml)**: a dependency audit plus a full Windows installer build (downloadable from the workflow run's artifacts).
 
 📖 **Publishing a release?** Releases are built and published automatically by GitHub Actions when a version tag is pushed — see **[RELEASING.md](RELEASING.md)**.
 
@@ -282,11 +282,13 @@ Every pull request and push to `main` runs **[CI](.github/workflows/ci.yml)**: a
 
 Pull requests are welcome!
 
-1. Fork the repo and create a branch from `main`.
+1. Fork the repo and create a branch from **`dev`**.
 2. Make your change and check it runs with `npm start`.
-3. Open a pull request. `main` is protected, so a PR can only merge once **Dependency audit**, **Build (Windows)** and **CodeQL** all pass.
+3. Open a pull request **into `dev`**. CI (**Dependency audit** + **Build (Windows)**) runs on every PR.
 
-Dependabot opens weekly PRs to keep npm packages and GitHub Actions up to date.
+`dev` is the integration branch; it's merged into `main` through a pull request. `main` is protected, so that PR can only merge once **Dependency audit**, **Build (Windows)** and **CodeQL** all pass.
+
+Dependabot opens weekly PRs against `dev` to keep npm packages and GitHub Actions up to date.
 
 🔒 **Found a security issue?** Please don't open a public issue — report it privately as described in **[SECURITY.md](SECURITY.md)**.
 

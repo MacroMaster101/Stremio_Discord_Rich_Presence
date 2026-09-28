@@ -9,7 +9,7 @@ download it **and** receive automatic in-app updates.
 > the `.exe` **plus** the auto-generated `latest.yml` and `.blockmap` files.
 
 > ✨ Release files are intentionally hyphenated, like
-> `Stremio-Discord-Presence-Setup-1.0.13.exe`, so GitHub assets and `latest.yml` match.
+> `Stremio-Discord-Presence-Setup-1.0.14.exe`, so GitHub assets and `latest.yml` match.
 
 Releases are **built and published by GitHub Actions** ([`.github/workflows/release.yml`](.github/workflows/release.yml))
 when a version tag is pushed. You don't need to build or upload anything by hand.
@@ -22,32 +22,45 @@ when a version tag is pushed. You don't need to build or upload anything by hand
 - Dependencies installed: `npm install`.
 - GitHub CLI installed and logged in (`winget install --id GitHub.cli`, then `gh auth login`).
 
+> 🌿 **Branch flow:** feature branch → **`dev`** → **`main`**. Work is merged into `dev`
+> by pull request (then the feature branch is deleted), and `dev` is merged into `main`
+> by another pull request. Releases are tagged on `main` only.
+
 > 🔒 `main` is protected by a ruleset: changes land **only through pull requests** with
 > passing CI (**Dependency audit**, **Build (Windows)**, and CodeQL). Direct pushes and
 > force-pushes to `main` are blocked. Release tags (`v*`) can't be moved or deleted once pushed.
 
 ---
 
-## 1️⃣ Bump the version in a pull request
+## 1️⃣ Bump the version and get it onto `main`
 
 `electron-updater` decides whether an update is available by comparing the app version
 against the latest GitHub Release. **Bump it before every release.**
 
+Bump on a branch from `dev` and merge it into `dev`:
+
 ```powershell
-git checkout main
+git checkout dev
 git pull
-git checkout -b release-1.0.13
+git checkout -b release-1.0.14
 npm version patch --no-git-tag-version
-git commit -am "Bump version to 1.0.13"
-git push -u origin release-1.0.13
-gh pr create --fill
+git commit -am "Bump version to 1.0.14"
+git push -u origin release-1.0.14
+gh pr create --base dev --fill
 ```
 
 Use [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
-(e.g. `1.0.12` → `1.0.13` for a bug fix, `1.1.0` for a feature).
+(e.g. `1.0.13` → `1.0.14` for a bug fix, `1.1.0` for a feature).
 
-Wait for CI to pass, then **merge the PR**. CI also uploads the built installer as a
-workflow artifact, if you want to test it before releasing.
+Once CI passes, merge it into `dev` and delete the branch. Then promote `dev` to `main`:
+
+```powershell
+gh pr create --base main --head dev --title "Release 1.0.14" --fill
+```
+
+When CI and CodeQL pass, merge that PR with **Create a merge commit**. Don't delete `dev`.
+CI also uploads the built installer as a workflow artifact, if you want to test it before
+releasing.
 
 ---
 
@@ -56,11 +69,11 @@ workflow artifact, if you want to test it before releasing.
 ```powershell
 git checkout main
 git pull
-git tag v1.0.13
-git push origin v1.0.13
+git tag v1.0.14
+git push origin v1.0.14
 ```
 
-The tag (`v1.0.13`) **must** match the `version` in `package.json` (`1.0.13`) and point to a
+The tag (`v1.0.14`) **must** match the `version` in `package.json` (`1.0.14`) and point to a
 commit on `main`. The workflow refuses to publish otherwise.
 
 ---
@@ -84,7 +97,7 @@ gh run watch
 Anyone can verify a downloaded installer was built by this workflow:
 
 ```powershell
-gh attestation verify Stremio-Discord-Presence-Setup-1.0.13.exe --repo MacroMaster101/Stremio_Discord_Rich_Presence
+gh attestation verify Stremio-Discord-Presence-Setup-1.0.14.exe --repo MacroMaster101/Stremio_Discord_Rich_Presence
 ```
 
 ---
@@ -104,7 +117,7 @@ gh attestation verify Stremio-Discord-Presence-Setup-1.0.13.exe --repo MacroMast
 
 ## 🧾 Quick checklist
 
-- [ ] Version bumped in `package.json` and `package-lock.json` via a merged PR
+- [ ] Version bumped in `package.json` and `package-lock.json` via a PR into `dev`, then `dev` merged into `main`
 - [ ] CI green on `main`
 - [ ] Tag `vX.Y.Z` pushed from `main`, matching the app version
 - [ ] Release workflow succeeded
@@ -123,13 +136,13 @@ Only if GitHub Actions is unavailable. Build locally and upload the three files 
 
 ```powershell
 npm run dist
-gh release create v1.0.13 `
-  "dist\Stremio-Discord-Presence-Setup-1.0.13.exe" `
-  "dist\Stremio-Discord-Presence-Setup-1.0.13.exe.blockmap" `
+gh release create v1.0.14 `
+  "dist\Stremio-Discord-Presence-Setup-1.0.14.exe" `
+  "dist\Stremio-Discord-Presence-Setup-1.0.14.exe.blockmap" `
   "dist\latest.yml" `
   --repo MacroMaster101/Stremio_Discord_Rich_Presence `
   --verify-tag `
-  --title "v1.0.13" `
+  --title "v1.0.14" `
   --notes "Describe what changed in this release."
 ```
 
