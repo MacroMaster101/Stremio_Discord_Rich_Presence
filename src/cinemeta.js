@@ -78,6 +78,21 @@ function pickBest(metas, media) {
 }
 
 /**
+ * True only for a well-formed https:// URL string (what Discord accepts as an
+ * external image), so an unexpected response value is never passed along.
+ * @param {*} value
+ * @returns {boolean}
+ */
+function isHttpsUrl(value) {
+  if (typeof value !== 'string' || value.length > 512) return false;
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
  * Look up a poster image URL for the given parsed media info via Cinemeta.
  * Returns null if nothing matches or on any error.
  *
@@ -108,7 +123,7 @@ async function getPosterUrl(media) {
     best = result && pickBest(result.metas, media);
   }
 
-  const url = best && best.poster ? best.poster : null;
+  const url = best && isHttpsUrl(best.poster) ? best.poster : null;
   cache.set(cacheKey, url);
   return url;
 }

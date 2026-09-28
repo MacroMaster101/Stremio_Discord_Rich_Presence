@@ -507,6 +507,10 @@ function fetchActiveMedia() {
           }
 
           const rawTitle = activeFile ? activeFile.name : activeTorrent.name;
+          // Only trust a plain string title from the local server response.
+          if (typeof rawTitle !== 'string' || !rawTitle.trim()) {
+            return resolve(null);
+          }
           resolve(parseMediaInfo(rawTitle));
         } catch (e) {
           resolve(null);
