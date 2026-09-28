@@ -16,7 +16,7 @@ A lightweight Windows companion that lives quietly in your system tray, detects 
 
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D6?style=flat-square&logo=windows&logoColor=white)
 ![Electron](https://img.shields.io/badge/Electron-47848F?style=flat-square&logo=electron&logoColor=white)
-![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?style=flat-square&logo=node.js&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-22.12%2B-339933?style=flat-square&logo=node.js&logoColor=white)
 ![No setup required](https://img.shields.io/badge/setup-zero%20config-brightgreen?style=flat-square)
 ![Privacy](https://img.shields.io/badge/privacy-first-blueviolet?style=flat-square)
 
@@ -36,7 +36,7 @@ A lightweight Windows companion that lives quietly in your system tray, detects 
 No tokens, no `.env`, no Discord account setup. Just install and run.
 
 📺 **Smart title parsing**
-Shows the series name with `SxxExx` + episode title, or the movie name and year — parsed straight from the active stream.
+Shows the series name with `SxxExx` + episode title, anime absolute episodes as `E60`, or the movie name and year — parsed straight from the active stream, with release-group and tracker tags stripped.
 
 🖼️ **Real poster art**
 Pulls genuine posters from Stremio's own Cinemeta addon (no API key) with a little Stremio badge overlay.
@@ -60,7 +60,7 @@ A status dot (🟢 connected · 🟡 connecting · 🔴 disconnected) with an ou
 Optional toggle to launch minimized at login — and it shows up in Task Manager's Startup tab.
 
 🔄 **Auto-updates**
-Checks GitHub for new versions, shows tray progress, downloads in the background, and restarts automatically when ready.
+Checks GitHub for new versions, shows tray progress, downloads in the background, and silently installs and restarts when ready.
 
 🔁 **Bulletproof reconnect**
 Handles Discord not running at startup, or being closed and reopened — it just reconnects.
@@ -75,18 +75,24 @@ Handles Discord not running at startup, or being closed and reopened — it just
 
 ### Option A — Installer *(recommended for most users)*
 
-1. Download **`Stremio-Discord-Presence-Setup-x.x.x.exe`** from the **[Releases](https://github.com/MacroMaster101/Stremio_Discord_Rich_Presence/releases)** page.
-2. Run it and follow the wizard — pick your install location. On the final step you can tick **Create a desktop shortcut** (a Start Menu shortcut is always added).
-3. Launch the app — it appears in your system tray and connects to Discord automatically.
+1. Download **`Stremio-Discord-Presence-Setup-x.x.x.exe`** from the **[latest release](https://github.com/MacroMaster101/Stremio_Discord_Rich_Presence/releases/latest)**.
+2. Run it — it's a **one-click installer**: no wizard, no admin prompt. It installs for your Windows user and adds **Desktop** and **Start Menu** shortcuts.
+3. The app launches into your system tray and connects to Discord automatically. Future versions install themselves via auto-update.
 
 > 🛡️ **First launch:** Windows SmartScreen may warn about an "unknown publisher" because the app isn't signed with a paid certificate. Click **More info → Run anyway** — it's expected for indie apps.
+>
+> Want proof the installer is genuine? Every release is built by GitHub Actions from this repo's source with a signed [build provenance attestation](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations). With the [GitHub CLI](https://cli.github.com/) you can verify it:
+>
+> ```bash
+> gh attestation verify Stremio-Discord-Presence-Setup-x.x.x.exe --repo MacroMaster101/Stremio_Discord_Rich_Presence
+> ```
 
 > 💡 That's it. No Node.js, no `.env`, no Discord account setup — the app ships with a built-in Discord application ID.
 
 ### Option B — Run from source *(for developers)*
 
 ```bash
-# 1. Install Node.js v18+   →  https://nodejs.org/
+# 1. Install Node.js v22.12+ (LTS recommended)  →  https://nodejs.org/
 # 2. Install dependencies
 npm install
 
@@ -182,7 +188,7 @@ stremio-discord-presence/
 │       ├── ci.yml          # Audit + Windows build on every PR / push to main
 │       └── release.yml     # Builds & publishes a release when a v* tag is pushed
 ├── build/
-│   └── installer.nsh       # Custom NSIS: desktop shortcut choice + startup cleanup
+│   └── installer.nsh       # Custom NSIS: removes startup entries on uninstall
 ├── assets/
 │   ├── app-icon.ico        # Windows executable / installer icon
 │   ├── app-icon.png        # App window & About icon
@@ -266,7 +272,23 @@ npm run dist
 
 > **Note:** Building the NSIS installer (`npm run dist`) may require **Developer Mode** enabled (Settings → Privacy & security → For developers) or an elevated terminal, because it creates symbolic links. The portable build (`npm run pack`) has no such requirement.
 
-📖 **Want to publish a release `.exe` to GitHub?** See **[RELEASING.md](RELEASING.md)** for the full step-by-step guide.
+Every pull request and push to `main` runs **[CI](.github/workflows/ci.yml)**: a dependency audit plus a full Windows installer build (downloadable from the workflow run's artifacts).
+
+📖 **Publishing a release?** Releases are built and published automatically by GitHub Actions when a version tag is pushed — see **[RELEASING.md](RELEASING.md)**.
+
+---
+
+## 🤝 Contributing
+
+Pull requests are welcome!
+
+1. Fork the repo and create a branch from `main`.
+2. Make your change and check it runs with `npm start`.
+3. Open a pull request. `main` is protected, so a PR can only merge once **Dependency audit**, **Build (Windows)** and **CodeQL** all pass.
+
+Dependabot opens weekly PRs to keep npm packages and GitHub Actions up to date.
+
+🔒 **Found a security issue?** Please don't open a public issue — report it privately as described in **[SECURITY.md](SECURITY.md)**.
 
 ---
 
@@ -278,10 +300,12 @@ npm run dist
 
 **Recently shipped ✅**
 
+- 🔐 **Security & release pipeline** — CodeQL scanning, Dependabot, private vulnerability reporting, a protected `main` branch, and CI-built releases with build provenance attestations.
+- 🎌 **Anime episode detection** — absolute episode numbers shown as `E60` (not `S01E60`), with fansub group, CRC and tracker tags stripped.
+- ⚡ **One-click installer** — no wizard; makes silent auto-updates install reliably.
 - 🟣 **Browsing state** — shows *"Browsing Stremio"* when idle, switching to the title on playback.
 - 🔄 **Auto-updates** — tray progress, background download, and automatic restart/install when ready.
 - 🎨 **Redesigned About window** and a **theme-aware tray icon** that adapts to light/dark taskbars.
-- 🖥️ **Desktop-shortcut choice** — an opt-in checkbox on the installer's final step.
 - 📺 **Rich title parsing** — series name with `SxxExx` + episode title, or movie name and year.
 - 🖼️ **Poster artwork** — real posters from Stremio's Cinemeta addon (no API key) with a Stremio badge overlay.
 - 🔘 **Presence buttons** — "Get Stremio" and "Search Title" on the Rich Presence card.

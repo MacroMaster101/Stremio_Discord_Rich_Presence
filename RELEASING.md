@@ -18,7 +18,7 @@ when a version tag is pushed. You don't need to build or upload anything by hand
 
 ## ✅ Prerequisites (one-time)
 
-- [Node.js](https://nodejs.org/) v18+ installed.
+- [Node.js](https://nodejs.org/) v22.12+ installed (required by Electron 42).
 - Dependencies installed: `npm install`.
 - GitHub CLI installed and logged in (`winget install --id GitHub.cli`, then `gh auth login`).
 
