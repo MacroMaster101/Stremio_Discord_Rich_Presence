@@ -12,6 +12,7 @@ A lightweight Windows companion that lives quietly in your system tray, detects 
 
 [![Download](https://img.shields.io/github/v/release/MacroMaster101/Stremio_Discord_Rich_Presence?style=for-the-badge&label=Download&logo=windows&color=5865F2)](https://github.com/MacroMaster101/Stremio_Discord_Rich_Presence/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/MacroMaster101/Stremio_Discord_Rich_Presence/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/MacroMaster101/Stremio_Discord_Rich_Presence/actions/workflows/ci.yml)
 
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D6?style=flat-square&logo=windows&logoColor=white)
 ![Electron](https://img.shields.io/badge/Electron-47848F?style=flat-square&logo=electron&logoColor=white)
@@ -156,7 +157,9 @@ This app is **privacy-respecting by default**:
 
 <br/>
 
-- Minimal dependencies (`discord-rpc`, `dotenv`); `npm audit` reports **0 vulnerabilities**.
+- Found a vulnerability? Please report it privately — see **[SECURITY.md](SECURITY.md)**.
+- Minimal dependencies (`discord-rpc`, `dotenv`, `electron-updater`); CI fails on high/critical `npm audit` advisories, Dependabot keeps dependencies current, and CodeQL scans every pull request.
+- Release installers are built by GitHub Actions with a [build provenance attestation](RELEASING.md#3️⃣-let-the-release-workflow-publish-it).
 - The process check runs a fixed system command with **no user input**, so there's no command-injection surface.
 - App windows follow Electron's security guidelines: `contextIsolation` on, `nodeIntegration` off, `sandbox` on, with a minimal `contextBridge` preload. External links open through a main-process allow-list.
 
@@ -171,7 +174,13 @@ stremio-discord-presence/
 ├── package.json            # Node dependencies, build config & scripts
 ├── README.md               # Documentation & setup instructions
 ├── RELEASING.md            # How to build & publish a release
+├── SECURITY.md             # How to report a vulnerability
 ├── .env.example            # Environment variables template
+├── .github/
+│   ├── dependabot.yml      # Weekly npm + GitHub Actions update PRs
+│   └── workflows/
+│       ├── ci.yml          # Audit + Windows build on every PR / push to main
+│       └── release.yml     # Builds & publishes a release when a v* tag is pushed
 ├── build/
 │   └── installer.nsh       # Custom NSIS: desktop shortcut choice + startup cleanup
 ├── assets/
