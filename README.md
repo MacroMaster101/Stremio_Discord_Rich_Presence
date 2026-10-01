@@ -278,6 +278,12 @@ Every pull request and every push to `dev` or `main` runs **[CI](.github/workflo
 
 ---
 
+## 🧩 Community ports
+
+- **[stremio-discord-presence-go](https://github.com/jasserhouimli/stremio-discord-presence-go)** — unofficial Go rewrite of the core presence (~10 MB single `.exe`, no Electron): detection, title parsing, posters, privacy mode, autostart, self-updates. No installer or themed tray icons yet.
+
+---
+
 ## 🤝 Contributing
 
 Pull requests are welcome!
