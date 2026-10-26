@@ -18,12 +18,12 @@
   "license": "MIT",
   "dependencies": {
     "discord-rpc": "^4.0.1",
-    "dotenv": "^18.0.4",
-    "electron-updater": "^6.8.9"
+    "dotenv": "^18.0.9",
+    "electron-updater": "^6.8.11"
   },
   "devDependencies": {
     "electron": "^44.4.5",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.18.0"
   },
   "build": {
     "appId": "com.kavishalakshan.stremiodiscordpresence",
